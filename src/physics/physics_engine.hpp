@@ -3,6 +3,7 @@
 
 #include "../game_api.h"
 #include "collision_detector.hpp"
+#include "bunny_hop.hpp"
 #include <vector>
 
 // Bounding box structure
@@ -50,6 +51,7 @@ class PhysicsEngine {
 private:
     std::vector<RigidBody> rigid_bodies;
     CollisionDetector collision_detector;
+    BunnyHopController bunny_hop_controller;
     
     float gravity;
     float air_resistance;
@@ -83,6 +85,10 @@ public:
     
     // Utility functions
     float calculate_player_speed(const PlayerState& player);
+    
+    // Bunny hop mechanics
+    void apply_bunny_hop(PlayerState& player, const InputState& input, float delta_time);
+    BunnyHopController* get_bunny_hop_controller();
     
     // Settings
     void set_gravity(float gravity);

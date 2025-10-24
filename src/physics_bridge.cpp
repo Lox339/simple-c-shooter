@@ -117,6 +117,50 @@ int get_physics_body_count() {
     return 0;
 }
 
+void apply_bunny_hop_movement(PlayerState* player, const InputState* input, float delta_time) {
+    if (g_physics_engine && player && input) {
+        g_physics_engine->apply_bunny_hop(*player, *input, delta_time);
+    }
+}
+
+void set_bunny_hop_max_ground_speed(float speed) {
+    if (g_physics_engine) {
+        BunnyHopController* controller = g_physics_engine->get_bunny_hop_controller();
+        if (controller) {
+            controller->set_max_ground_speed(speed);
+        }
+    }
+}
+
+void set_bunny_hop_max_air_speed(float speed) {
+    if (g_physics_engine) {
+        BunnyHopController* controller = g_physics_engine->get_bunny_hop_controller();
+        if (controller) {
+            controller->set_max_air_speed(speed);
+        }
+    }
+}
+
+float get_bunny_hop_max_ground_speed() {
+    if (g_physics_engine) {
+        BunnyHopController* controller = g_physics_engine->get_bunny_hop_controller();
+        if (controller) {
+            return controller->get_max_ground_speed();
+        }
+    }
+    return 0.0f;
+}
+
+float get_bunny_hop_max_air_speed() {
+    if (g_physics_engine) {
+        BunnyHopController* controller = g_physics_engine->get_bunny_hop_controller();
+        if (controller) {
+            return controller->get_max_air_speed();
+        }
+    }
+    return 0.0f;
+}
+
 void cleanup_physics_engine() {
     std::cout << "Cleaning up Physics Bridge..." << std::endl;
     

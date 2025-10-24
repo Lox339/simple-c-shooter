@@ -35,6 +35,13 @@ void set_physics_gravity(float gravity);
 // Query functions
 int get_physics_body_count();
 
+// Bunny hop functions
+void apply_bunny_hop_movement(PlayerState* player, const InputState* input, float delta_time);
+void set_bunny_hop_max_ground_speed(float speed);
+void set_bunny_hop_max_air_speed(float speed);
+float get_bunny_hop_max_ground_speed();
+float get_bunny_hop_max_air_speed();
+
 #ifdef __cplusplus
 }
 #endif

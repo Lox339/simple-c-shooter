@@ -1,5 +1,6 @@
 #include "physics_engine.hpp"
 #include "collision_detector.hpp"
+#include "bunny_hop.hpp"
 #include "../game_api.h"
 #include <iostream>
 #include <cmath>
@@ -22,6 +23,12 @@ bool PhysicsEngine::initialize() {
     // Initialize collision detector
     if (!collision_detector.initialize()) {
         std::cerr << "Failed to initialize collision detector" << std::endl;
+        return false;
+    }
+    
+    // Initialize bunny hop controller
+    if (!bunny_hop_controller.initialize()) {
+        std::cerr << "Failed to initialize bunny hop controller" << std::endl;
         return false;
     }
     
@@ -272,6 +279,16 @@ int PhysicsEngine::get_rigid_body_count() const {
     return count;
 }
 
+void PhysicsEngine::apply_bunny_hop(PlayerState& player, const InputState& input, float delta_time) {
+    if (initialized) {
+        bunny_hop_controller.update_movement(player, input, delta_time);
+    }
+}
+
+BunnyHopController* PhysicsEngine::get_bunny_hop_controller() {
+    return initialized ? &bunny_hop_controller : nullptr;
+}
+
 void PhysicsEngine::cleanup() {
     if (!initialized) {
         return;
@@ -279,6 +296,7 @@ void PhysicsEngine::cleanup() {
     
     std::cout << "Cleaning up Physics Engine..." << std::endl;
     
+    bunny_hop_controller.cleanup();
     collision_detector.cleanup();
     rigid_bodies.clear();
     
