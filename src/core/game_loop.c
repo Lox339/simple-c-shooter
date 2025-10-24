@@ -6,6 +6,7 @@
 #include "input_manager.h"
 #include "object_manager.h"
 #include "../graphics_bridge.h"
+#include "../physics_bridge.h"
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
@@ -61,6 +62,11 @@ void init_core_engine() {
         printf("Warning: Graphics engine initialization failed - running in text mode\n");
     }
     
+    // Initialize physics engine
+    if (!init_physics_engine()) {
+        printf("Warning: Physics engine initialization failed - using basic physics\n");
+    }
+    
     // Seed random number generator
     srand((unsigned int)time(NULL));
     
@@ -94,6 +100,9 @@ void run_game_loop() {
         
         // Update game logic
         update_game_logic((float)g_game_loop.delta_time);
+        
+        // Update physics
+        update_physics((float)g_game_loop.delta_time);
         
         // Render frame
         render_game_frame(game_state);
@@ -216,6 +225,7 @@ double get_delta_time() {
 
 void cleanup_core() {
     printf("Cleaning up Core Engine...\n");
+    cleanup_physics_engine();
     cleanup_graphics_engine();
     cleanup_object_manager();
     cleanup_input_manager();
