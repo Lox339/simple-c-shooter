@@ -57,11 +57,17 @@ void init_core_engine() {
 
 void run_game_loop() {
     printf("Starting game loop...\n");
+    printf("Press Q to quit, ESC to pause/resume, WASD to move, SPACE to jump\n");
     
     GameState* game_state = get_game_state();
+    
+    // Start in playing mode for input testing
+    game_state->current_phase = GAME_PLAYING;
+    
     double target_frame_time = 1.0 / g_game_loop.target_fps;
     int frame_count = 0;
     double fps_timer = 0.0;
+    double status_timer = 0.0;
     
     while (game_state->game_running) {
         // Calculate delta time
@@ -80,11 +86,25 @@ void run_game_loop() {
         // FPS counter
         frame_count++;
         fps_timer += g_game_loop.delta_time;
+        status_timer += g_game_loop.delta_time;
         
         if (fps_timer >= 1.0) {
-            printf("FPS: %d, Delta: %.3fms\n", frame_count, g_game_loop.delta_time * 1000.0);
+            printf("FPS: %d, Delta: %.3fms, Phase: %s\n", 
+                   frame_count, g_game_loop.delta_time * 1000.0,
+                   game_state->current_phase == GAME_PLAYING ? "PLAYING" :
+                   game_state->current_phase == GAME_PAUSED ? "PAUSED" : "OTHER");
             frame_count = 0;
             fps_timer = 0.0;
+        }
+        
+        // Player status every 3 seconds
+        if (status_timer >= 3.0) {
+            PlayerState* player = &game_state->player;
+            printf("Player Status - Pos(%.2f,%.2f,%.2f) Rot(%.1f,%.1f,%.1f) Speed:%.2f Ground:%s\n",
+                   player->position.x, player->position.y, player->position.z,
+                   player->rotation.x, player->rotation.y, player->rotation.z,
+                   player->speed, player->on_ground ? "YES" : "NO");
+            status_timer = 0.0;
         }
         
         // Frame rate limiting
@@ -96,14 +116,6 @@ void run_game_loop() {
             if (sleep_time > 0) {
                 sleep_ms(sleep_time);
             }
-        }
-        
-        // Simple exit condition for testing (remove when input system is complete)
-        static int test_frames = 0;
-        test_frames++;
-        if (test_frames > 300) { // Run for ~5 seconds at 60 FPS
-            game_state->game_running = 0;
-            printf("Test run completed after %d frames\n", test_frames);
         }
     }
     
@@ -153,10 +165,8 @@ void update_gameplay(float delta_time) {
         // Projectile update logic will be implemented later
     }
     
-    // Simple test: move player forward slowly
-    if (game_state->current_phase == GAME_PLAYING) {
-        game_state->player.velocity.x = 1.0f; // Move forward for testing
-    }
+    // Gameplay logic is now handled by input system
+    // Player movement is controlled by WASD keys
 }
 
 void set_target_fps(int fps) {

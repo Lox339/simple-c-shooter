@@ -20,21 +20,15 @@ GameState* get_game_state() {
 }
 
 void handle_input(int key, int action) {
-    // Input handling will be implemented later
-    (void)key;    // Suppress unused parameter warning
-    (void)action; // Suppress unused parameter warning
+    handle_keyboard_input(key, action);
 }
 
 void handle_mouse(float x_offset, float y_offset) {
-    // Mouse handling will be implemented later
-    (void)x_offset; // Suppress unused parameter warning
-    (void)y_offset; // Suppress unused parameter warning
+    handle_mouse_movement(x_offset, y_offset);
 }
 
 void handle_mouse_click(int button, int action) {
-    // Mouse click handling will be implemented later
-    (void)button; // Suppress unused parameter warning
-    (void)action; // Suppress unused parameter warning
+    handle_mouse_click(button, action);
 }
 
 void cleanup_game() {
