@@ -26,6 +26,7 @@ set(CORE_SOURCES
     src/core/game_loop.c
     src/core/input_manager.c
     src/core/game_state.c
+    src/core/object_manager.c
     src/game_api.c
 )
 

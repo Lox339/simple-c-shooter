@@ -4,8 +4,10 @@
 #include "game_loop.h"
 #include "game_state.h"
 #include "input_manager.h"
+#include "object_manager.h"
 #include <stdio.h>
 #include <time.h>
+#include <stdlib.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -51,6 +53,10 @@ void init_core_engine() {
     // Initialize subsystems
     init_game_state();
     init_input_manager();
+    init_object_manager();
+    
+    // Seed random number generator
+    srand((unsigned int)time(NULL));
     
     printf("Core Engine initialized - Target FPS: %d\n", g_game_loop.target_fps);
 }
@@ -97,13 +103,17 @@ void run_game_loop() {
             fps_timer = 0.0;
         }
         
-        // Player status every 3 seconds
+        // Game status every 3 seconds
         if (status_timer >= 3.0) {
             PlayerState* player = &game_state->player;
-            printf("Player Status - Pos(%.2f,%.2f,%.2f) Rot(%.1f,%.1f,%.1f) Speed:%.2f Ground:%s\n",
+            printf("=== GAME STATUS ===\n");
+            printf("Player: Pos(%.2f,%.2f,%.2f) Health:%d/%d Speed:%.2f Ground:%s\n",
                    player->position.x, player->position.y, player->position.z,
-                   player->rotation.x, player->rotation.y, player->rotation.z,
-                   player->speed, player->on_ground ? "YES" : "NO");
+                   player->health, player->max_health, player->speed, 
+                   player->on_ground ? "YES" : "NO");
+            printf("Enemies: %d, Projectiles: %d, Score: %d\n",
+                   game_state->enemy_count, game_state->projectile_count, game_state->score);
+            printf("==================\n");
             status_timer = 0.0;
         }
         
@@ -147,7 +157,12 @@ void update_game_logic(float delta_time) {
             break;
             
         case GAME_OVER:
-            // Game over logic
+            // Game over logic - stop the game after showing final score
+            static float game_over_timer = 0.0f;
+            game_over_timer += delta_time;
+            if (game_over_timer > 3.0f) { // Show game over for 3 seconds
+                game_state->game_running = 0;
+            }
             break;
     }
 }
@@ -155,18 +170,18 @@ void update_game_logic(float delta_time) {
 void update_gameplay(float delta_time) {
     GameState* game_state = get_game_state();
     
-    // Update enemies (placeholder)
-    for (int i = 0; i < game_state->enemy_count; i++) {
-        // Enemy update logic will be implemented later
-    }
+    // Update game objects
+    update_enemies(delta_time);
+    update_projectiles(delta_time);
     
-    // Update projectiles (placeholder)
-    for (int i = 0; i < game_state->projectile_count; i++) {
-        // Projectile update logic will be implemented later
-    }
+    // Spawn enemies periodically
+    spawn_enemies_periodically(delta_time);
     
-    // Gameplay logic is now handled by input system
-    // Player movement is controlled by WASD keys
+    // Check game over condition
+    if (game_state->player.health <= 0) {
+        game_state->current_phase = GAME_OVER;
+        printf("GAME OVER! Final Score: %d\n", game_state->score);
+    }
 }
 
 void set_target_fps(int fps) {
@@ -186,6 +201,7 @@ double get_delta_time() {
 
 void cleanup_core() {
     printf("Cleaning up Core Engine...\n");
+    cleanup_object_manager();
     cleanup_input_manager();
     cleanup_game_state();
     printf("Core Engine cleaned up\n");

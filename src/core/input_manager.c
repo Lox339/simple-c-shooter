@@ -1,5 +1,6 @@
 #include "input_manager.h"
 #include "game_state.h"
+#include "object_manager.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -123,6 +124,14 @@ void process_input() {
     g_input_state.mouse_delta_x = sinf(test_mouse_time * mouse_speed) * 0.1f;
     g_input_state.mouse_delta_y = cosf(test_mouse_time * mouse_speed * 0.7f) * 0.05f;
     
+    // Simulate mouse clicks for shooting every 3 seconds
+    static float shoot_timer = 0.0f;
+    shoot_timer += game_state->delta_time;
+    if (shoot_timer >= 3.0f && game_state->current_phase == GAME_PLAYING) {
+        handle_mouse_click(0, 1); // Left mouse button click
+        shoot_timer = 0.0f;
+    }
+    
     // Update mouse position
     g_input_state.mouse_x += g_input_state.mouse_delta_x;
     g_input_state.mouse_y += g_input_state.mouse_delta_y;
@@ -198,8 +207,7 @@ void handle_mouse_click(int button, int action) {
         g_input_state.mouse_buttons[button] = action;
         
         if (button == 0 && action) { // Left mouse button
-            printf("Left mouse button clicked - Fire!\n");
-            // Shooting logic will be implemented later
+            fire_weapon();
         }
     }
 }
@@ -306,6 +314,54 @@ float get_mouse_sensitivity() {
 
 InputState* get_input_state() {
     return &g_input_state;
+}
+
+void fire_weapon() {
+    GameState* game_state = get_game_state();
+    if (!game_state || game_state->current_phase != GAME_PLAYING) {
+        return;
+    }
+    
+    PlayerState* player = &game_state->player;
+    
+    // Check if player has ammo
+    if (player->ammo <= 0) {
+        printf("No ammo! Reload needed.\n");
+        return;
+    }
+    
+    // Calculate projectile spawn position (slightly in front of player)
+    float yaw = player->rotation.y * M_PI / 180.0f;
+    Vector3 forward = {sinf(yaw), 0.0f, cosf(yaw)};
+    
+    Vector3 spawn_pos = {
+        player->position.x + forward.x * 1.0f,
+        player->position.y + 1.0f, // Shoot from chest height
+        player->position.z + forward.z * 1.0f
+    };
+    
+    // Calculate projectile velocity (forward direction with some upward angle)
+    float pitch = player->rotation.x * M_PI / 180.0f;
+    Vector3 velocity = {
+        forward.x * 20.0f, // Fast horizontal speed
+        -sinf(pitch) * 20.0f, // Vertical component based on pitch
+        forward.z * 20.0f
+    };
+    
+    // Create projectile
+    int projectile_id = create_projectile(PROJECTILE_PLAYER_BULLET, spawn_pos, velocity, 0);
+    
+    if (projectile_id >= 0) {
+        // Consume ammo
+        player->ammo--;
+        printf("FIRE! Ammo: %d/%d\n", player->ammo, player->max_ammo);
+        
+        // Auto-reload when empty
+        if (player->ammo == 0) {
+            player->ammo = player->max_ammo;
+            printf("Auto-reload! Ammo: %d/%d\n", player->ammo, player->max_ammo);
+        }
+    }
 }
 
 void cleanup_input_manager() {

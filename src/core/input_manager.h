@@ -13,6 +13,7 @@ void handle_keyboard_input(int key, int action);
 void handle_mouse_movement(float x_offset, float y_offset);
 void handle_mouse_click(int button, int action);
 void apply_input_to_player();
+void fire_weapon();
 
 // Input query functions
 int is_key_pressed(int key);
