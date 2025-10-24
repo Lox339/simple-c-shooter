@@ -1,5 +1,11 @@
 # Simple 3D Shooter
 
+[![Build Status](https://github.com/Lox339/simple-c-shooter/workflows/Build%20Multi-Language%203D%20Shooter/badge.svg)](https://github.com/Lox339/simple-c-shooter/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![C](https://img.shields.io/badge/C-11-blue.svg)](https://en.wikipedia.org/wiki/C11_(C_standard_revision))
+[![C++](https://img.shields.io/badge/C++-17-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B17)
+[![C#](https://img.shields.io/badge/C%23-6.0-purple.svg)](https://docs.microsoft.com/en-us/dotnet/csharp/)
+
 3D шутер от первого лица, разработанный с использованием трех языков программирования:
 - **C** - основной игровой движок
 - **C++** - графическая подсистема и физика  
@@ -81,6 +87,18 @@ dotnet build
 ```bash
 ./build/simple_shooter
 ```
+
+## Автоматическая сборка
+
+Проект настроен для автоматической сборки через GitHub Actions:
+
+- ✅ **Мультиплатформенная сборка**: Windows, Linux, macOS
+- ✅ **C/C++ компоненты**: CMake + OpenGL + GLFW
+- ✅ **C# компонент**: .NET 6.0
+- ✅ **Интеграционные тесты**: проверка совместимости компонентов
+- ✅ **Релизные артефакты**: автоматическая упаковка для всех платформ
+
+[Посмотреть статус сборки](https://github.com/Lox339/simple-c-shooter/actions)
 
 ## Разработка
 
