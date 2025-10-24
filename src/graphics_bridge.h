@@ -13,6 +13,10 @@ void render_game_frame(const GameState* game_state);
 bool graphics_should_close();
 void cleanup_graphics_engine();
 
+// Window information functions
+int get_graphics_window_width();
+int get_graphics_window_height();
+
 #ifdef __cplusplus
 }
 #endif

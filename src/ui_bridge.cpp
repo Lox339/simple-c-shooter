@@ -7,60 +7,88 @@ static bool g_ui_initialized = false;
 
 extern "C" {
 
+// External UI rendering functions from graphics engine
+extern "C" void render_text_opengl(const char* text, float x, float y, float r, float g, float b);
+extern "C" void render_ui_background_opengl(float x, float y, float width, float height, 
+                                           float r, float g, float b, float a);
+extern "C" void render_crosshair_opengl(float x, float y, float size, float r, float g, float b);
+
 // UI rendering functions that C# will call
 void render_text(const char* text, float x, float y, float r, float g, float b) {
-    // Placeholder - in real implementation, this would render text using OpenGL
-    // For now, just output to console occasionally
+    render_text_opengl(text, x, y, r, g, b);
+    
+    // Debug output occasionally
     static int call_count = 0;
-    if (++call_count % 100 == 0) { // Only print every 100th call to avoid spam
-        printf("[UI] Text at (%.0f,%.0f): %s\n", x, y, text);
+    if (++call_count % 100 == 0) {
+        printf("[UI] Rendered text: %s at (%.0f,%.0f)\n", text, x, y);
     }
 }
 
 void render_ui_background(float x, float y, float width, float height, float r, float g, float b, float a) {
-    // Placeholder - in real implementation, this would render a colored rectangle
+    render_ui_background_opengl(x, y, width, height, r, g, b, a);
+    
+    // Debug output occasionally
     static int call_count = 0;
-    if (++call_count % 50 == 0) { // Only print every 50th call
-        printf("[UI] Background at (%.0f,%.0f) size %.0fx%.0f\n", x, y, width, height);
+    if (++call_count % 50 == 0) {
+        printf("[UI] Rendered background at (%.0f,%.0f) size %.0fx%.0f\n", x, y, width, height);
     }
 }
 
 void render_crosshair(float x, float y, float size, float r, float g, float b) {
-    // Placeholder - in real implementation, this would render crosshair lines
+    render_crosshair_opengl(x, y, size, r, g, b);
+    
+    // Debug output occasionally
     static int call_count = 0;
-    if (++call_count % 200 == 0) { // Only print every 200th call
-        printf("[UI] Crosshair at (%.0f,%.0f) size %.0f\n", x, y, size);
+    if (++call_count % 200 == 0) {
+        printf("[UI] Rendered crosshair at (%.0f,%.0f) size %.0f\n", x, y, size);
     }
 }
 
+// External function to get actual game state from Core Engine
+extern "C" GameState* get_core_game_state();
+
 // Functions that C# can call to get game data
 GameState* get_game_state() {
-    // This should return the actual game state
-    // For now, we'll need to implement this properly
-    static GameState dummy_state = {0};
-    return &dummy_state;
+    // Return the actual game state from Core Engine
+    return get_core_game_state();
 }
 
+// External functions to get window size from graphics engine
+extern "C" int get_graphics_window_width();
+extern "C" int get_graphics_window_height();
+
 int get_window_width() {
-    return 1024; // Default width
+    int width = get_graphics_window_width();
+    return width > 0 ? width : 1024; // Fallback to default
 }
 
 int get_window_height() {
-    return 768; // Default height
+    int height = get_graphics_window_height();
+    return height > 0 ? height : 768; // Fallback to default
 }
+
+// External UI renderer functions
+extern "C" bool init_ui_renderer();
+extern "C" void cleanup_ui_renderer();
 
 // UI management functions
 bool init_ui_manager() {
     std::cout << "Initializing UI Bridge..." << std::endl;
     
-    // In a real implementation, we would:
+    // Initialize OpenGL UI renderer
+    if (!init_ui_renderer()) {
+        std::cerr << "Failed to initialize UI renderer" << std::endl;
+        return false;
+    }
+    
+    // In a real implementation, we would also:
     // 1. Load the C# assembly
     // 2. Get the UIManager class
     // 3. Create an instance
     // 4. Call Initialize method
     
     g_ui_initialized = true;
-    std::cout << "UI Bridge initialized (placeholder)" << std::endl;
+    std::cout << "UI Bridge initialized with OpenGL renderer" << std::endl;
     return true;
 }
 
@@ -101,7 +129,10 @@ void cleanup_ui_manager() {
     
     std::cout << "Cleaning up UI Bridge..." << std::endl;
     
-    // In a real implementation, we would:
+    // Cleanup UI renderer
+    cleanup_ui_renderer();
+    
+    // In a real implementation, we would also:
     // 1. Call C# Cleanup method
     // 2. Release the C# assembly
     

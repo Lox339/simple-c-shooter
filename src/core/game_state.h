@@ -5,6 +5,7 @@
 
 void init_game_state();
 GameState* get_game_state();
+GameState* get_core_game_state(); // For UI bridge
 void update_game_state(float delta_time);
 void cleanup_game_state();
 

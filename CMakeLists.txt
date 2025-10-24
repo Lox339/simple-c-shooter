@@ -45,6 +45,7 @@ set(GRAPHICS_SOURCES
     src/graphics/model.cpp
     src/graphics/material.cpp
     src/graphics/math_utils.cpp
+    src/graphics/ui_renderer.cpp
     src/graphics_bridge.cpp
     src/physics/physics_engine.cpp
     src/physics/bunny_hop.cpp

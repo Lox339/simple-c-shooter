@@ -56,6 +56,10 @@ void update_game_state(float delta_time) {
                                      g_game_state.player.velocity.z * g_game_state.player.velocity.z);
 }
 
+GameState* get_core_game_state() {
+    return &g_game_state;
+}
+
 void cleanup_game_state() {
     printf("Game State cleaned up\n");
 }
