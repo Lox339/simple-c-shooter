@@ -184,9 +184,23 @@ REM Check for vcpkg (optional)
 where vcpkg >nul 2>&1
 if errorlevel 1 (
     call :print_warning "vcpkg not found - dependencies must be installed manually"
+    call :print_warning "To install vcpkg: git clone https://github.com/Microsoft/vcpkg.git"
+    call :print_warning "Then run: .\vcpkg\bootstrap-vcpkg.bat"
 ) else (
     call :print_success "vcpkg found"
-    set CMAKE_ARGS=%CMAKE_ARGS% -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake
+    
+    REM Install dependencies if vcpkg.json exists
+    if exist "vcpkg.json" (
+        call :print_status "Installing vcpkg dependencies..."
+        vcpkg install --triplet x64-windows
+        if errorlevel 1 (
+            call :print_warning "vcpkg dependency installation failed"
+        ) else (
+            call :print_success "vcpkg dependencies installed"
+        )
+    )
+    
+    set CMAKE_ARGS=%CMAKE_ARGS% -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
 )
 
 REM Clean build directory if requested

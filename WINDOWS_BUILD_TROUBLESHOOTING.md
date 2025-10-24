@@ -31,12 +31,17 @@ cd vcpkg
 .\bootstrap-vcpkg.bat
 .\vcpkg integrate install
 
-# Установка зависимостей
+# Автоматическая установка зависимостей (используется vcpkg.json)
+vcpkg install --triplet x64-windows
+
+# Или установка зависимостей вручную:
 .\vcpkg install glfw3:x64-windows
 .\vcpkg install glew:x64-windows
 .\vcpkg install openal-soft:x64-windows
 .\vcpkg install libsndfile:x64-windows
 ```
+
+**Примечание:** Проект теперь включает файл `vcpkg.json`, который автоматически определяет необходимые зависимости. Просто запустите `vcpkg install --triplet x64-windows` в корневой директории проекта.
 
 ### Вариант 2: Ручная установка
 
@@ -83,17 +88,22 @@ cmake -B build -DGLFW_ROOT="C:\path\to\glfw"
 
 ### 4. "GLEW не найден"
 ```
-Could NOT find GLEW (missing: GLEW_LIBRARY GLEW_INCLUDE_DIR)
+Could NOT find GLEW (missing: GLEW_INCLUDE_DIRS GLEW_LIBRARIES)
 ```
 
 **Решение:**
 ```cmd
-# С vcpkg:
+# С vcpkg (рекомендуется):
 vcpkg install glew:x64-windows
+
+# Убедитесь, что используется vcpkg toolchain:
+cmake -B build -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows
 
 # Или укажите путь вручную:
 cmake -B build -DGLEW_ROOT="C:\path\to\glew"
 ```
+
+**Примечание:** Начиная с версии 1.0.0, проект использует `vcpkg.json` для автоматического управления зависимостями. CMakeLists.txt был обновлен для лучшей совместимости с различными способами установки GLEW.
 
 ### 5. Ошибки линковки OpenGL
 ```

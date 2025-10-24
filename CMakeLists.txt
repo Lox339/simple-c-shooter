@@ -43,18 +43,56 @@ find_package(PkgConfig)
 # Find OpenGL
 find_package(OpenGL REQUIRED)
 
-# Find GLFW
-find_package(glfw3 REQUIRED)
+# Find GLFW - try different approaches for vcpkg compatibility
+find_package(glfw3 QUIET)
 if(NOT glfw3_FOUND)
-    message(STATUS "GLFW not found via find_package, trying pkg-config")
-    pkg_check_modules(GLFW REQUIRED glfw3)
+    find_package(glfw QUIET)
+    if(NOT glfw_FOUND)
+        message(STATUS "GLFW not found via find_package, trying pkg-config")
+        pkg_check_modules(GLFW REQUIRED glfw3)
+    endif()
 endif()
 
-# Find GLEW
-find_package(GLEW REQUIRED)
+# Handle different GLFW target names
+if(TARGET glfw)
+    set(GLFW_TARGET glfw)
+    set(glfw3_FOUND TRUE)
+elseif(TARGET glfw3::glfw3)
+    set(GLFW_TARGET glfw3::glfw3)
+    set(glfw3_FOUND TRUE)
+elseif(GLFW_LIBRARIES)
+    set(GLFW_TARGET ${GLFW_LIBRARIES})
+    set(glfw3_FOUND TRUE)
+else()
+    message(FATAL_ERROR "GLFW not found - please install GLFW via vcpkg or system package manager")
+endif()
+
+# Find GLEW - try different approaches for vcpkg compatibility
+find_package(GLEW QUIET)
 if(NOT GLEW_FOUND)
-    message(STATUS "GLEW not found via find_package, trying pkg-config")
-    pkg_check_modules(GLEW REQUIRED glew)
+    # Try alternative package name for vcpkg
+    find_package(glew QUIET)
+    if(NOT glew_FOUND)
+        message(STATUS "GLEW not found via find_package, trying pkg-config")
+        pkg_check_modules(GLEW REQUIRED glew)
+    endif()
+endif()
+
+# Handle different GLEW target names
+if(TARGET GLEW::glew)
+    set(GLEW_TARGET GLEW::glew)
+    set(GLEW_FOUND TRUE)
+elseif(TARGET GLEW::GLEW)
+    set(GLEW_TARGET GLEW::GLEW)
+    set(GLEW_FOUND TRUE)
+elseif(TARGET unofficial::glew::glew)
+    set(GLEW_TARGET unofficial::glew::glew)
+    set(GLEW_FOUND TRUE)
+elseif(GLEW_LIBRARIES)
+    set(GLEW_TARGET ${GLEW_LIBRARIES})
+    set(GLEW_FOUND TRUE)
+else()
+    message(FATAL_ERROR "GLEW not found - please install GLEW via vcpkg or system package manager")
 endif()
 
 # Find OpenAL (optional for audio)
@@ -71,11 +109,13 @@ include_directories(
     ${OPENGL_INCLUDE_DIRS}
 )
 
-if(GLFW_FOUND)
+# Include directories are handled by target_link_libraries for modern CMake targets
+# Only add manual include directories if using legacy variables
+if(GLFW_INCLUDE_DIRS)
     include_directories(${GLFW_INCLUDE_DIRS})
 endif()
 
-if(GLEW_FOUND)
+if(GLEW_INCLUDE_DIRS)
     include_directories(${GLEW_INCLUDE_DIRS})
 endif()
 
@@ -147,17 +187,13 @@ target_link_libraries(simple_shooter
 )
 
 # Link GLFW
-if(TARGET glfw)
-    target_link_libraries(simple_shooter glfw)
-elseif(GLFW_FOUND)
-    target_link_libraries(simple_shooter ${GLFW_LIBRARIES})
+if(DEFINED GLFW_TARGET)
+    target_link_libraries(simple_shooter ${GLFW_TARGET})
 endif()
 
 # Link GLEW
-if(TARGET GLEW::GLEW)
-    target_link_libraries(simple_shooter GLEW::GLEW)
-elseif(GLEW_FOUND)
-    target_link_libraries(simple_shooter ${GLEW_LIBRARIES})
+if(DEFINED GLEW_TARGET)
+    target_link_libraries(simple_shooter ${GLEW_TARGET})
 endif()
 
 # Link OpenAL if available
@@ -186,16 +222,12 @@ target_link_libraries(game_core
     ${PLATFORM_LIBS}
 )
 
-if(TARGET glfw)
-    target_link_libraries(game_core glfw)
-elseif(GLFW_FOUND)
-    target_link_libraries(game_core ${GLFW_LIBRARIES})
+if(DEFINED GLFW_TARGET)
+    target_link_libraries(game_core ${GLFW_TARGET})
 endif()
 
-if(TARGET GLEW::GLEW)
-    target_link_libraries(game_core GLEW::GLEW)
-elseif(GLEW_FOUND)
-    target_link_libraries(game_core ${GLEW_LIBRARIES})
+if(DEFINED GLEW_TARGET)
+    target_link_libraries(game_core ${GLEW_TARGET})
 endif()
 
 if(OpenAL_FOUND)
@@ -288,5 +320,11 @@ message(STATUS "  C++ Compiler: ${CMAKE_CXX_COMPILER}")
 message(STATUS "  OpenGL: ${OPENGL_FOUND}")
 message(STATUS "  GLFW: ${glfw3_FOUND}")
 message(STATUS "  GLEW: ${GLEW_FOUND}")
+if(DEFINED GLFW_TARGET)
+    message(STATUS "  GLFW Target: ${GLFW_TARGET}")
+endif()
+if(DEFINED GLEW_TARGET)
+    message(STATUS "  GLEW Target: ${GLEW_TARGET}")
+endif()
 message(STATUS "  OpenAL: ${OpenAL_FOUND}")
 message(STATUS "")
