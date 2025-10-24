@@ -1,6 +1,7 @@
 #include "input_manager.h"
 #include "game_state.h"
 #include "object_manager.h"
+#include "../physics_bridge.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -219,62 +220,9 @@ void apply_input_to_player() {
     }
     
     PlayerState* player = &game_state->player;
-    float move_speed = 5.0f;
     float delta_time = game_state->delta_time;
     
-    // Calculate movement direction based on camera rotation
-    float yaw = player->rotation.y * M_PI / 180.0f; // Convert to radians
-    
-    Vector3 forward = {sinf(yaw), 0.0f, cosf(yaw)};
-    Vector3 right = {cosf(yaw), 0.0f, -sinf(yaw)};
-    
-    Vector3 movement = {0.0f, 0.0f, 0.0f};
-    
-    // WASD movement
-    if (g_input_state.keys[KEY_W]) {
-        movement.x += forward.x;
-        movement.z += forward.z;
-    }
-    if (g_input_state.keys[KEY_S]) {
-        movement.x -= forward.x;
-        movement.z -= forward.z;
-    }
-    if (g_input_state.keys[KEY_A]) {
-        movement.x -= right.x;
-        movement.z -= right.z;
-    }
-    if (g_input_state.keys[KEY_D]) {
-        movement.x += right.x;
-        movement.z += right.z;
-    }
-    
-    // Normalize movement vector
-    float movement_length = sqrtf(movement.x * movement.x + movement.z * movement.z);
-    if (movement_length > 0.0f) {
-        movement.x = (movement.x / movement_length) * move_speed;
-        movement.z = (movement.z / movement_length) * move_speed;
-        
-        // Apply movement to player velocity
-        player->velocity.x = movement.x;
-        player->velocity.z = movement.z;
-        
-        printf("Player moving: velocity(%.2f, %.2f, %.2f) speed: %.2f\n", 
-               player->velocity.x, player->velocity.y, player->velocity.z, player->speed);
-    } else {
-        // Stop horizontal movement when no keys pressed
-        player->velocity.x = 0.0f;
-        player->velocity.z = 0.0f;
-    }
-    
-    // Handle jumping
-    if (g_input_state.jump_pressed && player->on_ground) {
-        player->velocity.y = 8.0f; // Jump velocity
-        player->on_ground = 0;
-        player->last_jump_time = 0.0f; // Reset for bunny hop mechanics
-        printf("Player jumped! Velocity Y: %.2f\n", player->velocity.y);
-    }
-    
-    // Apply mouse movement to camera rotation
+    // Apply mouse movement to camera rotation first
     player->rotation.y += g_input_state.mouse_delta_x * 0.1f; // Yaw
     player->rotation.x += g_input_state.mouse_delta_y * 0.1f; // Pitch
     
@@ -285,6 +233,20 @@ void apply_input_to_player() {
     // Wrap yaw rotation
     while (player->rotation.y > 360.0f) player->rotation.y -= 360.0f;
     while (player->rotation.y < 0.0f) player->rotation.y += 360.0f;
+    
+    // Use bunny hop physics for movement
+    apply_bunny_hop_movement(player, &g_input_state, delta_time);
+    
+    // Debug output for speed tracking
+    static float debug_timer = 0.0f;
+    debug_timer += delta_time;
+    if (debug_timer >= 1.0f) { // Every second
+        if (player->speed > 12.0f) { // Only show when moving fast
+            printf("Bunny Hop Status - Speed: %.1f u/s, Ground: %s, Jumps: %d\n",
+                   player->speed, player->on_ground ? "YES" : "NO", player->consecutive_jumps);
+        }
+        debug_timer = 0.0f;
+    }
 }
 
 int is_key_pressed(int key) {

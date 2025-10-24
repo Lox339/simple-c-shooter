@@ -65,6 +65,17 @@ void init_core_engine() {
     // Initialize physics engine
     if (!init_physics_engine()) {
         printf("Warning: Physics engine initialization failed - using basic physics\n");
+    } else {
+        // Configure bunny hop parameters
+        printf("Configuring bunny hop mechanics...\n");
+        
+        // Set balanced parameters for gameplay
+        set_bunny_hop_max_ground_speed(12.0f);  // Slightly higher ground speed
+        set_bunny_hop_max_air_speed(25.0f);     // Reasonable air speed limit
+        
+        printf("Ground speed limit: %.1f u/s\n", get_bunny_hop_max_ground_speed());
+        printf("Air speed limit: %.1f u/s\n", get_bunny_hop_max_air_speed());
+        printf("Bunny hop mechanics ready!\n");
     }
     
     // Seed random number generator
@@ -131,11 +142,18 @@ void run_game_loop() {
         if (status_timer >= 3.0) {
             PlayerState* player = &game_state->player;
             printf("=== GAME STATUS ===\n");
-            printf("Player: Pos(%.2f,%.2f,%.2f) Health:%d/%d Speed:%.2f Ground:%s\n",
+            printf("Player: Pos(%.2f,%.2f,%.2f) Health:%d/%d\n",
                    player->position.x, player->position.y, player->position.z,
-                   player->health, player->max_health, player->speed, 
-                   player->on_ground ? "YES" : "NO");
-            printf("Enemies: %d, Projectiles: %d, Score: %d\n",
+                   player->health, player->max_health);
+            
+            // Speedometer display (right corner simulation)
+            printf("                                                    [SPEED: %.1f u/s]\n", player->speed);
+            if (player->speed > get_bunny_hop_max_ground_speed()) {
+                printf("                                                    [BUNNY HOP ACTIVE!]\n");
+            }
+            
+            printf("Ground:%s Jumps:%d Enemies:%d Projectiles:%d Score:%d\n",
+                   player->on_ground ? "YES" : "NO", player->consecutive_jumps,
                    game_state->enemy_count, game_state->projectile_count, game_state->score);
             printf("==================\n");
             status_timer = 0.0;

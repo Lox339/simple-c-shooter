@@ -44,28 +44,16 @@ GameState* get_game_state() {
 void update_game_state(float delta_time) {
     g_game_state.delta_time = delta_time;
     
-    // Update player physics (basic gravity simulation)
-    if (!g_game_state.player.on_ground) {
-        g_game_state.player.velocity.y -= 9.81f * delta_time; // Gravity
-        g_game_state.player.position.y += g_game_state.player.velocity.y * delta_time;
-        
-        // Simple ground collision
-        if (g_game_state.player.position.y <= 0.0f) {
-            g_game_state.player.position.y = 0.0f;
-            g_game_state.player.velocity.y = 0.0f;
-            g_game_state.player.on_ground = 1;
-        }
-    }
-    
-    // Update player horizontal movement
-    g_game_state.player.position.x += g_game_state.player.velocity.x * delta_time;
-    g_game_state.player.position.z += g_game_state.player.velocity.z * delta_time;
-    
-    // Calculate current speed for speedometer
+    // Player physics is now handled by BunnyHopController in the physics engine
+    // Just update the speed calculations here for consistency
     float horizontal_velocity = sqrtf(g_game_state.player.velocity.x * g_game_state.player.velocity.x + 
                                      g_game_state.player.velocity.z * g_game_state.player.velocity.z);
-    g_game_state.player.speed = horizontal_velocity;
     g_game_state.player.horizontal_speed = horizontal_velocity;
+    
+    // Total speed calculation
+    g_game_state.player.speed = sqrtf(g_game_state.player.velocity.x * g_game_state.player.velocity.x + 
+                                     g_game_state.player.velocity.y * g_game_state.player.velocity.y + 
+                                     g_game_state.player.velocity.z * g_game_state.player.velocity.z);
 }
 
 void cleanup_game_state() {
