@@ -7,6 +7,7 @@
 #include "object_manager.h"
 #include "../graphics_bridge.h"
 #include "../physics_bridge.h"
+#include "../ui_bridge.h"
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
@@ -78,6 +79,11 @@ void init_core_engine() {
         printf("Bunny hop mechanics ready!\n");
     }
     
+    // Initialize UI manager
+    if (!init_ui_manager()) {
+        printf("Warning: UI Manager initialization failed - using console output\n");
+    }
+    
     // Seed random number generator
     srand((unsigned int)time(NULL));
     
@@ -115,8 +121,14 @@ void run_game_loop() {
         // Update physics
         update_physics((float)g_game_loop.delta_time);
         
+        // Update UI
+        update_ui_manager((float)g_game_loop.delta_time);
+        
         // Render frame
         render_game_frame(game_state);
+        
+        // Render UI overlay
+        render_ui_manager();
         
         // Check if graphics window should close
         if (graphics_should_close()) {
@@ -243,6 +255,7 @@ double get_delta_time() {
 
 void cleanup_core() {
     printf("Cleaning up Core Engine...\n");
+    cleanup_ui_manager();
     cleanup_physics_engine();
     cleanup_graphics_engine();
     cleanup_object_manager();

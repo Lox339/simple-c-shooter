@@ -50,6 +50,7 @@ set(GRAPHICS_SOURCES
     src/physics/bunny_hop.cpp
     src/physics/collision_detector.cpp
     src/physics_bridge.cpp
+    src/ui_bridge.cpp
 )
 
 # Create static libraries
