@@ -3,6 +3,7 @@
 
 #include "renderer.hpp"
 #include "camera.hpp"
+#include "model.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -28,32 +29,74 @@
 #include <GLFW/glfw3.h>
 #endif
 
-// Simple vertex shader source
+// Enhanced vertex shader with lighting support
 const char* vertex_shader_source = R"(
 #version 330 core
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aColor;
+layout (location = 2) in vec3 aNormal;
+layout (location = 3) in vec2 aTexCoord;
 
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform vec3 lightPos;
+uniform vec3 lightColor;
+uniform vec3 viewPos;
 
 out vec3 vertexColor;
+out vec3 normal;
+out vec3 fragPos;
+out vec2 texCoord;
+out vec3 lightDir;
+out vec3 viewDir;
 
 void main() {
-    gl_Position = projection * view * model * vec4(aPos, 1.0);
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    gl_Position = projection * view * worldPos;
+    
     vertexColor = aColor;
+    normal = mat3(transpose(inverse(model))) * aNormal;
+    fragPos = vec3(worldPos);
+    texCoord = aTexCoord;
+    
+    lightDir = normalize(lightPos - fragPos);
+    viewDir = normalize(viewPos - fragPos);
 }
 )";
 
-// Simple fragment shader source
+// Enhanced fragment shader with basic lighting
 const char* fragment_shader_source = R"(
 #version 330 core
 in vec3 vertexColor;
+in vec3 normal;
+in vec3 fragPos;
+in vec2 texCoord;
+in vec3 lightDir;
+in vec3 viewDir;
+
+uniform vec3 lightColor;
+uniform float ambientStrength;
+uniform float specularStrength;
+
 out vec4 FragColor;
 
 void main() {
-    FragColor = vec4(vertexColor, 1.0);
+    // Ambient lighting
+    vec3 ambient = ambientStrength * lightColor;
+    
+    // Diffuse lighting
+    vec3 norm = normalize(normal);
+    float diff = max(dot(norm, lightDir), 0.0);
+    vec3 diffuse = diff * lightColor;
+    
+    // Specular lighting
+    vec3 reflectDir = reflect(-lightDir, norm);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
+    vec3 specular = specularStrength * spec * lightColor;
+    
+    vec3 result = (ambient + diffuse + specular) * vertexColor;
+    FragColor = vec4(result, 1.0);
 }
 )";
 
@@ -120,8 +163,14 @@ bool Renderer::initialize() {
         return false;
     }
     
-    // Initialize basic geometry
-    setup_basic_geometry();
+    // Setup lighting
+    setup_lighting();
+    
+    // Initialize models
+    if (!initialize_models()) {
+        std::cerr << "Failed to initialize 3D models" << std::endl;
+        return false;
+    }
     
     // Initialize camera
     camera.initialize();
@@ -182,61 +231,27 @@ bool Renderer::create_shader_program() {
     return true;
 }
 
-void Renderer::setup_basic_geometry() {
-    // Cube vertices with colors
-    float vertices[] = {
-        // Positions          // Colors
-        -0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,  // Red
-         0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f,  // Green
-         0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f,  // Blue
-        -0.5f,  0.5f, -0.5f,  1.0f, 1.0f, 0.0f,  // Yellow
-        -0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 1.0f,  // Magenta
-         0.5f, -0.5f,  0.5f,  0.0f, 1.0f, 1.0f,  // Cyan
-         0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 1.0f,  // White
-        -0.5f,  0.5f,  0.5f,  0.5f, 0.5f, 0.5f   // Gray
-    };
+void Renderer::setup_lighting() {
+    // Set lighting uniforms
+    glUseProgram(shader_program);
     
-    unsigned int indices[] = {
-        // Front face
-        0, 1, 2, 2, 3, 0,
-        // Back face
-        4, 5, 6, 6, 7, 4,
-        // Left face
-        7, 3, 0, 0, 4, 7,
-        // Right face
-        1, 5, 6, 6, 2, 1,
-        // Top face
-        3, 2, 6, 6, 7, 3,
-        // Bottom face
-        0, 1, 5, 5, 4, 0
-    };
+    // Light position (above and to the side)
+    int light_pos_loc = glGetUniformLocation(shader_program, "lightPos");
+    glUniform3f(light_pos_loc, 10.0f, 10.0f, 10.0f);
     
-    // Generate and bind VAO
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
+    // Light color (white)
+    int light_color_loc = glGetUniformLocation(shader_program, "lightColor");
+    glUniform3f(light_color_loc, 1.0f, 1.0f, 1.0f);
     
-    // Generate and bind VBO
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    // Ambient strength
+    int ambient_loc = glGetUniformLocation(shader_program, "ambientStrength");
+    glUniform1f(ambient_loc, 0.3f);
     
-    // Generate and bind EBO
-    glGenBuffers(1, &ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    // Specular strength
+    int specular_loc = glGetUniformLocation(shader_program, "specularStrength");
+    glUniform1f(specular_loc, 0.5f);
     
-    // Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    
-    // Color attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    
-    // Unbind VAO
-    glBindVertexArray(0);
-    
-    std::cout << "Basic cube geometry setup complete" << std::endl;
+    std::cout << "Lighting setup complete" << std::endl;
 }
 
 void Renderer::render_frame(const GameState& game_state) {
@@ -269,15 +284,27 @@ void Renderer::render_frame(const GameState& game_state) {
     set_matrix_uniform("view", view_matrix);
     set_matrix_uniform("projection", projection_matrix);
     
-    // Render player (as a small cube at player position for debugging)
-    Matrix4 player_model = create_translation_matrix(game_state.player.position.x,
-                                                    game_state.player.position.y + 0.5f,
-                                                    game_state.player.position.z);
-    player_model = multiply_matrices(player_model, create_scale_matrix(0.2f, 0.2f, 0.2f));
-    set_matrix_uniform("model", player_model);
-    render_cube();
+    // Set view position for lighting
+    int view_pos_loc = glGetUniformLocation(shader_program, "viewPos");
+    glUniform3f(view_pos_loc, game_state.player.position.x, 
+                game_state.player.position.y + 1.8f, game_state.player.position.z);
     
-    // Render enemies
+    // Get model pointers
+    const Model* cube_model = get_cube_model();
+    const Model* sphere_model = get_sphere_model();
+    const Model* plane_model = get_plane_model();
+    
+    // Render player (as a small cube at player position for debugging)
+    if (cube_model) {
+        Matrix4 player_model = create_translation_matrix(game_state.player.position.x,
+                                                        game_state.player.position.y + 0.5f,
+                                                        game_state.player.position.z);
+        player_model = multiply_matrices(player_model, create_scale_matrix(0.2f, 0.2f, 0.2f));
+        set_matrix_uniform("model", player_model);
+        cube_model->render();
+    }
+    
+    // Render enemies with different models based on type
     for (int i = 0; i < game_state.enemy_count; i++) {
         const Enemy& enemy = game_state.enemies[i];
         if (enemy.ai_state == AI_DEAD) continue;
@@ -286,33 +313,53 @@ void Renderer::render_frame(const GameState& game_state) {
                                                        enemy.position.y + 0.5f,
                                                        enemy.position.z);
         
-        // Scale based on enemy type
-        float scale = (enemy.type == ENEMY_HEAVY) ? 1.2f : 
-                     (enemy.type == ENEMY_FAST) ? 0.8f : 1.0f;
-        enemy_model = multiply_matrices(enemy_model, create_scale_matrix(scale, scale, scale));
+        // Choose model and scale based on enemy type
+        const Model* enemy_model_ptr = nullptr;
+        float scale = 1.0f;
         
-        set_matrix_uniform("model", enemy_model);
-        render_cube();
+        switch (enemy.type) {
+            case ENEMY_BASIC:
+                enemy_model_ptr = cube_model;
+                scale = 1.0f;
+                break;
+            case ENEMY_FAST:
+                enemy_model_ptr = sphere_model;
+                scale = 0.8f;
+                break;
+            case ENEMY_HEAVY:
+                enemy_model_ptr = cube_model;
+                scale = 1.4f;
+                break;
+        }
+        
+        if (enemy_model_ptr) {
+            enemy_model = multiply_matrices(enemy_model, create_scale_matrix(scale, scale, scale));
+            set_matrix_uniform("model", enemy_model);
+            enemy_model_ptr->render();
+        }
     }
     
-    // Render projectiles
-    for (int i = 0; i < game_state.projectile_count; i++) {
-        const Projectile& projectile = game_state.projectiles[i];
-        
-        Matrix4 projectile_model = create_translation_matrix(projectile.position.x,
-                                                           projectile.position.y,
-                                                           projectile.position.z);
-        projectile_model = multiply_matrices(projectile_model, create_scale_matrix(0.1f, 0.1f, 0.1f));
-        
-        set_matrix_uniform("model", projectile_model);
-        render_cube();
+    // Render projectiles as small spheres
+    if (sphere_model) {
+        for (int i = 0; i < game_state.projectile_count; i++) {
+            const Projectile& projectile = game_state.projectiles[i];
+            
+            Matrix4 projectile_model = create_translation_matrix(projectile.position.x,
+                                                               projectile.position.y,
+                                                               projectile.position.z);
+            projectile_model = multiply_matrices(projectile_model, create_scale_matrix(0.1f, 0.1f, 0.1f));
+            
+            set_matrix_uniform("model", projectile_model);
+            sphere_model->render();
+        }
     }
     
     // Render ground plane
-    Matrix4 ground_model = create_translation_matrix(0.0f, -0.5f, 0.0f);
-    ground_model = multiply_matrices(ground_model, create_scale_matrix(50.0f, 0.1f, 50.0f));
-    set_matrix_uniform("model", ground_model);
-    render_cube();
+    if (plane_model) {
+        Matrix4 ground_model = create_translation_matrix(0.0f, -0.5f, 0.0f);
+        set_matrix_uniform("model", ground_model);
+        plane_model->render();
+    }
     
 #ifdef GLFW_AVAILABLE
     // Swap buffers and poll events
@@ -321,11 +368,7 @@ void Renderer::render_frame(const GameState& game_state) {
 #endif
 }
 
-void Renderer::render_cube() {
-    glBindVertexArray(vao);
-    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
-}
+// Remove old render_cube function - now using Model system
 
 void Renderer::set_matrix_uniform(const char* name, const Matrix4& matrix) {
     int location = glGetUniformLocation(shader_program, name);
@@ -347,10 +390,10 @@ void Renderer::cleanup() {
     
     std::cout << "Cleaning up Graphics Engine..." << std::endl;
     
+    // Clean up models
+    cleanup_models();
+    
     // Clean up OpenGL objects
-    if (vao) glDeleteVertexArrays(1, &vao);
-    if (vbo) glDeleteBuffers(1, &vbo);
-    if (ebo) glDeleteBuffers(1, &ebo);
     if (shader_program) glDeleteProgram(shader_program);
     
     camera.cleanup();

@@ -39,7 +39,6 @@ private:
 #endif
     
     unsigned int shader_program;
-    unsigned int vao, vbo, ebo;
     int window_width, window_height;
     bool initialized;
     
@@ -47,8 +46,7 @@ private:
     
     // Private methods
     bool create_shader_program();
-    void setup_basic_geometry();
-    void render_cube();
+    void setup_lighting();
     void set_matrix_uniform(const char* name, const Matrix4& matrix);
     
 #ifdef GLFW_AVAILABLE
