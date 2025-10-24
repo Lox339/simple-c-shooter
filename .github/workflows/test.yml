@@ -54,6 +54,12 @@ jobs:
           libsndfile \
           pkg-config
 
+    - name: Setup vcpkg (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
+
     - name: Install Windows dependencies
       if: matrix.os == 'windows-latest'
       run: |
@@ -67,7 +73,7 @@ jobs:
       run: |
         cmake -B ${{github.workspace}}/build \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-          ${{ matrix.os == 'windows-latest' && '-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake' || '' }}
+          ${{ matrix.os == 'windows-latest' && '-DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -A x64' || '' }}
 
     - name: Build with Debug info
       run: |
