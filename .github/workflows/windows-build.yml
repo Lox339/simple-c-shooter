@@ -80,4 +80,8 @@ jobs:
             ctest --test-dir build --output-on-failure || true
           else
             echo "No build directory found - skipping tests"
+<<<<<<< HEAD
           fi
+=======
+          fi
+>>>>>>> 81dd9081c4f9a6f7ce31cd2bb79e5c6f3a1d0551
