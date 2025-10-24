@@ -5,6 +5,7 @@
 #include "game_state.h"
 #include "input_manager.h"
 #include "object_manager.h"
+#include "../graphics_bridge.h"
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
@@ -55,6 +56,11 @@ void init_core_engine() {
     init_input_manager();
     init_object_manager();
     
+    // Initialize graphics engine
+    if (!init_graphics_engine()) {
+        printf("Warning: Graphics engine initialization failed - running in text mode\n");
+    }
+    
     // Seed random number generator
     srand((unsigned int)time(NULL));
     
@@ -88,6 +94,15 @@ void run_game_loop() {
         
         // Update game logic
         update_game_logic((float)g_game_loop.delta_time);
+        
+        // Render frame
+        render_game_frame(game_state);
+        
+        // Check if graphics window should close
+        if (graphics_should_close()) {
+            game_state->game_running = 0;
+            printf("Graphics window closed\n");
+        }
         
         // FPS counter
         frame_count++;
@@ -201,6 +216,7 @@ double get_delta_time() {
 
 void cleanup_core() {
     printf("Cleaning up Core Engine...\n");
+    cleanup_graphics_engine();
     cleanup_object_manager();
     cleanup_input_manager();
     cleanup_game_state();

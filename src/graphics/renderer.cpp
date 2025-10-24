@@ -1,14 +1,374 @@
 // Graphics & Physics Engine - Renderer Implementation
-// This file will contain the OpenGL rendering logic
+// OpenGL 3D rendering system
 
 #include "renderer.hpp"
+#include "camera.hpp"
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
 
-// Placeholder for renderer implementation
-void Renderer::initialize() {
-    std::cout << "Graphics Engine initialized" << std::endl;
+// OpenGL headers
+#ifdef _WIN32
+#include <windows.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
+#else
+#ifdef __APPLE__
+#include <OpenGL/gl.h>
+#include <OpenGL/glu.h>
+#else
+#include <GL/gl.h>
+#include <GL/glu.h>
+#endif
+#endif
+
+// GLFW for window management
+#ifdef GLFW_AVAILABLE
+#include <GLFW/glfw3.h>
+#endif
+
+// Simple vertex shader source
+const char* vertex_shader_source = R"(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aColor;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+out vec3 vertexColor;
+
+void main() {
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
+    vertexColor = aColor;
+}
+)";
+
+// Simple fragment shader source
+const char* fragment_shader_source = R"(
+#version 330 core
+in vec3 vertexColor;
+out vec4 FragColor;
+
+void main() {
+    FragColor = vec4(vertexColor, 1.0);
+}
+)";
+
+Renderer::Renderer() : 
+    window(nullptr),
+    shader_program(0),
+    vao(0),
+    vbo(0),
+    ebo(0),
+    window_width(1024),
+    window_height(768),
+    initialized(false) {
+}
+
+Renderer::~Renderer() {
+    cleanup();
+}
+
+bool Renderer::initialize() {
+    std::cout << "Initializing Graphics Engine..." << std::endl;
+    
+#ifdef GLFW_AVAILABLE
+    // Initialize GLFW
+    if (!glfwInit()) {
+        std::cerr << "Failed to initialize GLFW" << std::endl;
+        return false;
+    }
+    
+    // Configure GLFW
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
+    
+    // Create window
+    window = glfwCreateWindow(window_width, window_height, "Simple 3D Shooter", NULL, NULL);
+    if (!window) {
+        std::cerr << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return false;
+    }
+    
+    glfwMakeContextCurrent(window);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    
+    // Enable depth testing
+    glEnable(GL_DEPTH_TEST);
+    
+    // Set viewport
+    glViewport(0, 0, window_width, window_height);
+    
+    std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
+    std::cout << "GLSL Version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
+#else
+    std::cout << "GLFW not available - using software rendering fallback" << std::endl;
+#endif
+    
+    // Initialize shaders
+    if (!create_shader_program()) {
+        std::cerr << "Failed to create shader program" << std::endl;
+        return false;
+    }
+    
+    // Initialize basic geometry
+    setup_basic_geometry();
+    
+    // Initialize camera
+    camera.initialize();
+    
+    initialized = true;
+    std::cout << "Graphics Engine initialized successfully" << std::endl;
+    return true;
+}
+
+bool Renderer::create_shader_program() {
+    // Compile vertex shader
+    unsigned int vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertex_shader, 1, &vertex_shader_source, NULL);
+    glCompileShader(vertex_shader);
+    
+    // Check vertex shader compilation
+    int success;
+    char info_log[512];
+    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        glGetShaderInfoLog(vertex_shader, 512, NULL, info_log);
+        std::cerr << "Vertex shader compilation failed: " << info_log << std::endl;
+        return false;
+    }
+    
+    // Compile fragment shader
+    unsigned int fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragment_shader, 1, &fragment_shader_source, NULL);
+    glCompileShader(fragment_shader);
+    
+    // Check fragment shader compilation
+    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        glGetShaderInfoLog(fragment_shader, 512, NULL, info_log);
+        std::cerr << "Fragment shader compilation failed: " << info_log << std::endl;
+        return false;
+    }
+    
+    // Create shader program
+    shader_program = glCreateProgram();
+    glAttachShader(shader_program, vertex_shader);
+    glAttachShader(shader_program, fragment_shader);
+    glLinkProgram(shader_program);
+    
+    // Check program linking
+    glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
+    if (!success) {
+        glGetProgramInfoLog(shader_program, 512, NULL, info_log);
+        std::cerr << "Shader program linking failed: " << info_log << std::endl;
+        return false;
+    }
+    
+    // Clean up shaders
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
+    
+    std::cout << "Shaders compiled and linked successfully" << std::endl;
+    return true;
+}
+
+void Renderer::setup_basic_geometry() {
+    // Cube vertices with colors
+    float vertices[] = {
+        // Positions          // Colors
+        -0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,  // Red
+         0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f,  // Green
+         0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f,  // Blue
+        -0.5f,  0.5f, -0.5f,  1.0f, 1.0f, 0.0f,  // Yellow
+        -0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 1.0f,  // Magenta
+         0.5f, -0.5f,  0.5f,  0.0f, 1.0f, 1.0f,  // Cyan
+         0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 1.0f,  // White
+        -0.5f,  0.5f,  0.5f,  0.5f, 0.5f, 0.5f   // Gray
+    };
+    
+    unsigned int indices[] = {
+        // Front face
+        0, 1, 2, 2, 3, 0,
+        // Back face
+        4, 5, 6, 6, 7, 4,
+        // Left face
+        7, 3, 0, 0, 4, 7,
+        // Right face
+        1, 5, 6, 6, 2, 1,
+        // Top face
+        3, 2, 6, 6, 7, 3,
+        // Bottom face
+        0, 1, 5, 5, 4, 0
+    };
+    
+    // Generate and bind VAO
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+    
+    // Generate and bind VBO
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    
+    // Generate and bind EBO
+    glGenBuffers(1, &ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    
+    // Color attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    
+    // Unbind VAO
+    glBindVertexArray(0);
+    
+    std::cout << "Basic cube geometry setup complete" << std::endl;
+}
+
+void Renderer::render_frame(const GameState& game_state) {
+    if (!initialized) return;
+    
+#ifdef GLFW_AVAILABLE
+    if (glfwWindowShouldClose(window)) {
+        return;
+    }
+#endif
+    
+    // Clear screen
+    glClearColor(0.1f, 0.1f, 0.2f, 1.0f);  // Dark blue background
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    // Use shader program
+    glUseProgram(shader_program);
+    
+    // Update camera based on player state
+    camera.set_position(game_state.player.position.x, 
+                       game_state.player.position.y + 1.8f,  // Eye height
+                       game_state.player.position.z);
+    camera.set_rotation(game_state.player.rotation.x, game_state.player.rotation.y);
+    
+    // Get matrices
+    Matrix4 view_matrix = camera.get_view_matrix();
+    Matrix4 projection_matrix = camera.get_projection_matrix(window_width, window_height);
+    
+    // Set uniforms
+    set_matrix_uniform("view", view_matrix);
+    set_matrix_uniform("projection", projection_matrix);
+    
+    // Render player (as a small cube at player position for debugging)
+    Matrix4 player_model = create_translation_matrix(game_state.player.position.x,
+                                                    game_state.player.position.y + 0.5f,
+                                                    game_state.player.position.z);
+    player_model = multiply_matrices(player_model, create_scale_matrix(0.2f, 0.2f, 0.2f));
+    set_matrix_uniform("model", player_model);
+    render_cube();
+    
+    // Render enemies
+    for (int i = 0; i < game_state.enemy_count; i++) {
+        const Enemy& enemy = game_state.enemies[i];
+        if (enemy.ai_state == AI_DEAD) continue;
+        
+        Matrix4 enemy_model = create_translation_matrix(enemy.position.x,
+                                                       enemy.position.y + 0.5f,
+                                                       enemy.position.z);
+        
+        // Scale based on enemy type
+        float scale = (enemy.type == ENEMY_HEAVY) ? 1.2f : 
+                     (enemy.type == ENEMY_FAST) ? 0.8f : 1.0f;
+        enemy_model = multiply_matrices(enemy_model, create_scale_matrix(scale, scale, scale));
+        
+        set_matrix_uniform("model", enemy_model);
+        render_cube();
+    }
+    
+    // Render projectiles
+    for (int i = 0; i < game_state.projectile_count; i++) {
+        const Projectile& projectile = game_state.projectiles[i];
+        
+        Matrix4 projectile_model = create_translation_matrix(projectile.position.x,
+                                                           projectile.position.y,
+                                                           projectile.position.z);
+        projectile_model = multiply_matrices(projectile_model, create_scale_matrix(0.1f, 0.1f, 0.1f));
+        
+        set_matrix_uniform("model", projectile_model);
+        render_cube();
+    }
+    
+    // Render ground plane
+    Matrix4 ground_model = create_translation_matrix(0.0f, -0.5f, 0.0f);
+    ground_model = multiply_matrices(ground_model, create_scale_matrix(50.0f, 0.1f, 50.0f));
+    set_matrix_uniform("model", ground_model);
+    render_cube();
+    
+#ifdef GLFW_AVAILABLE
+    // Swap buffers and poll events
+    glfwSwapBuffers(window);
+    glfwPollEvents();
+#endif
+}
+
+void Renderer::render_cube() {
+    glBindVertexArray(vao);
+    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+}
+
+void Renderer::set_matrix_uniform(const char* name, const Matrix4& matrix) {
+    int location = glGetUniformLocation(shader_program, name);
+    if (location != -1) {
+        glUniformMatrix4fv(location, 1, GL_FALSE, matrix.data);
+    }
+}
+
+bool Renderer::should_close() {
+#ifdef GLFW_AVAILABLE
+    return window ? glfwWindowShouldClose(window) : true;
+#else
+    return false;
+#endif
 }
 
 void Renderer::cleanup() {
+    if (!initialized) return;
+    
+    std::cout << "Cleaning up Graphics Engine..." << std::endl;
+    
+    // Clean up OpenGL objects
+    if (vao) glDeleteVertexArrays(1, &vao);
+    if (vbo) glDeleteBuffers(1, &vbo);
+    if (ebo) glDeleteBuffers(1, &ebo);
+    if (shader_program) glDeleteProgram(shader_program);
+    
+    camera.cleanup();
+    
+#ifdef GLFW_AVAILABLE
+    if (window) {
+        glfwDestroyWindow(window);
+        window = nullptr;
+    }
+    glfwTerminate();
+#endif
+    
+    initialized = false;
     std::cout << "Graphics Engine cleaned up" << std::endl;
 }
+
+#ifdef GLFW_AVAILABLE
+void Renderer::framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+    glViewport(0, 0, width, height);
+}
+#endif
