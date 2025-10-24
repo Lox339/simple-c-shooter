@@ -5,13 +5,19 @@
 
 int main() {
     printf("Simple 3D Shooter - Starting...\n");
+    printf("=================================\n");
     
     // Initialize game systems
     init_game();
     init_core_engine();
     
-    printf("Game systems initialized successfully!\n");
-    printf("Project structure is ready for development.\n");
+    printf("\nGame systems initialized successfully!\n");
+    printf("Starting game loop test...\n\n");
+    
+    // Run the game loop
+    run_game_loop();
+    
+    printf("\nGame loop test completed.\n");
     
     // Cleanup
     cleanup_core();
