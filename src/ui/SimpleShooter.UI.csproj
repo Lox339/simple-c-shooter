@@ -1,35 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <OutputType>Library</OutputType>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>SimpleShooter.UI</AssemblyName>
+    <RootNamespace>SimpleShooter.UI</RootNamespace>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <AssemblyTitle>Simple Shooter UI Components</AssemblyTitle>
+    <AssemblyDescription>C# UI components for Simple Shooter game</AssemblyDescription>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Copyright>Copyright © Simple Shooter Team 2024</Copyright>
     <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <WarningsNotAsErrors />
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <PlatformTarget>x64</PlatformTarget>
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
+    <Optimize>false</Optimize>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <Optimize>true</Optimize>
+    <DefineConstants>TRACE</DefineConstants>
     <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>true</Optimize>
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="AudioSettings.cs" />
+    <Compile Include="GameHUD.cs" />
+    <Compile Include="MainMenu.cs" />
+    <Compile Include="PauseMenu.cs" />
+    <Compile Include="SettingsMenu.cs" />
+    <Compile Include="Speedometer.cs" />
+    <Compile Include="UIManager.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="7.0.0" />
     <PackageReference Include="System.Runtime.InteropServices" Version="4.3.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="UIManager.cs" />
-    <Compile Include="Speedometer.cs" />
-    <Compile Include="GameHUD.cs" />
-    <Compile Include="MainMenu.cs" />
-    <Compile Include="SettingsMenu.cs" />
+    <None Include="..\..\README.md" Link="README.md" />
+  </ItemGroup>
+
+  <!-- Copy native dependencies on build -->
+  <Target Name="CopyNativeDependencies" AfterTargets="Build">
+    <ItemGroup>
+      <NativeLibs Include="$(MSBuildProjectDirectory)\..\..\build\**\game_core.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NativeLibs)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Platform-specific runtime identifiers -->
+  <PropertyGroup>
+    <RuntimeIdentifiers>win-x64;linux-x64;osx-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <!-- Include native libraries in publish -->
+  <ItemGroup>
+    <Content Include="$(MSBuildProjectDirectory)\..\..\build\**\game_core.dll" Condition="'$(OS)' == 'Windows_NT'">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="$(MSBuildProjectDirectory)\..\..\build\**\libgame_core.so" Condition="'$(OS)' != 'Windows_NT' AND '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))'">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="$(MSBuildProjectDirectory)\..\..\build\**\libgame_core.dylib" Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))'">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

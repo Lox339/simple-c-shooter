@@ -3,40 +3,31 @@ using System.Runtime.InteropServices;
 
 namespace SimpleShooter.UI
 {
-    public class MainMenu
+    public class PauseMenu
     {
-        // Menu states
-        public enum MenuState
-        {
-            Main,
-            Settings,
-            Credits,
-            Quit
-        }
-        
-        private MenuState currentState;
         private int selectedOption;
         private bool isVisible;
         
-        // Menu options for main menu
-        private string[] mainMenuOptions = {
-            "Play Game",
-            "Settings", 
-            "Credits",
-            "Quit"
+        // Pause menu options
+        private string[] pauseMenuOptions = {
+            "Resume Game",
+            "Settings",
+            "Main Menu",
+            "Quit Game"
         };
         
         // UI positioning
         private float menuX;
         private float menuY;
-        private float menuWidth = 300;
-        private float menuHeight = 400;
+        private float menuWidth = 250;
+        private float menuHeight = 300;
         private int windowWidth = 1024;
         private int windowHeight = 768;
         
         // Animation
-        private float animationTime = 0.0f;
-        private float titlePulse = 0.0f;
+        private float fadeAlpha = 0.0f;
+        private float targetAlpha = 0.8f;
+        private float fadeSpeed = 3.0f;
         
         // Import game control functions
         [DllImport("game_core.dll", CallingConvention = CallingConvention.Cdecl)]
@@ -45,11 +36,10 @@ namespace SimpleShooter.UI
         [DllImport("game_core.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern void quit_game();
         
-        public MainMenu()
+        public PauseMenu()
         {
-            currentState = MenuState.Main;
             selectedOption = 0;
-            isVisible = true;
+            isVisible = false;
         }
         
         public bool Initialize(int width, int height)
@@ -61,7 +51,7 @@ namespace SimpleShooter.UI
             menuX = (windowWidth - menuWidth) / 2;
             menuY = (windowHeight - menuHeight) / 2;
             
-            Console.WriteLine($"Main Menu initialized at ({menuX}, {menuY})");
+            Console.WriteLine($"Pause Menu initialized at ({menuX}, {menuY})");
             return true;
         }
         
@@ -69,8 +59,11 @@ namespace SimpleShooter.UI
         {
             if (!isVisible) return;
             
-            animationTime += deltaTime;
-            titlePulse += deltaTime * 2.0f;
+            // Fade in animation
+            if (fadeAlpha < targetAlpha)
+            {
+                fadeAlpha = Math.Min(targetAlpha, fadeAlpha + fadeSpeed * deltaTime);
+            }
         }
         
         public void Render()
@@ -86,44 +79,34 @@ namespace SimpleShooter.UI
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error rendering main menu: {ex.Message}");
+                Console.WriteLine($"Error rendering pause menu: {ex.Message}");
             }
         }
         
         private void RenderBackground()
         {
-            // Semi-transparent dark background
-            RenderUIBackground(0, 0, windowWidth, windowHeight, 0.0f, 0.0f, 0.1f, 0.8f);
+            // Semi-transparent dark overlay
+            RenderUIBackground(0, 0, windowWidth, windowHeight, 0.0f, 0.0f, 0.0f, fadeAlpha * 0.7f);
             
             // Menu panel background
             RenderUIBackground(menuX - 20, menuY - 20, menuWidth + 40, menuHeight + 40, 
-                             0.1f, 0.1f, 0.2f, 0.9f);
+                             0.1f, 0.1f, 0.2f, fadeAlpha);
         }
         
         private void RenderTitle()
         {
-            // Animated title with pulsing effect
-            float pulse = (float)(Math.Sin(titlePulse) * 0.1f + 1.0f);
-            float titleX = menuX + menuWidth / 2 - 100; // Approximate centering
+            float titleX = menuX + menuWidth / 2 - 40;
             float titleY = menuY + 30;
             
-            // Title shadow
-            RenderText("3D SHOOTER", titleX + 2, titleY + 2, 0.0f, 0.0f, 0.0f);
-            
-            // Main title with pulse effect
-            RenderText("3D SHOOTER", titleX, titleY, 
-                      0.8f + pulse * 0.2f, 0.6f + pulse * 0.4f, 0.2f);
-            
-            // Subtitle
-            RenderText("Bunny Hop Edition", titleX + 10, titleY + 30, 0.7f, 0.7f, 0.7f);
+            RenderText("PAUSED", titleX, titleY, 1.0f, 1.0f, 0.2f);
         }
         
         private void RenderMenuOptions()
         {
-            float optionY = menuY + 120;
-            float optionSpacing = 50;
+            float optionY = menuY + 80;
+            float optionSpacing = 40;
             
-            for (int i = 0; i < mainMenuOptions.Length; i++)
+            for (int i = 0; i < pauseMenuOptions.Length; i++)
             {
                 float currentY = optionY + i * optionSpacing;
                 
@@ -131,17 +114,17 @@ namespace SimpleShooter.UI
                 if (i == selectedOption)
                 {
                     // Selection background
-                    RenderUIBackground(menuX + 10, currentY - 5, menuWidth - 20, 35, 
+                    RenderUIBackground(menuX + 10, currentY - 5, menuWidth - 20, 30, 
                                      0.3f, 0.3f, 0.5f, 0.7f);
                     
                     // Selected option text (brighter)
-                    RenderText($"> {mainMenuOptions[i]} <", menuX + 20, currentY, 
+                    RenderText($"> {pauseMenuOptions[i]} <", menuX + 15, currentY, 
                               1.0f, 1.0f, 0.2f);
                 }
                 else
                 {
                     // Normal option text
-                    RenderText(mainMenuOptions[i], menuX + 30, currentY, 
+                    RenderText(pauseMenuOptions[i], menuX + 25, currentY, 
                               0.8f, 0.8f, 0.8f);
                 }
             }
@@ -149,92 +132,46 @@ namespace SimpleShooter.UI
         
         private void RenderInstructions()
         {
-            float instructY = menuY + menuHeight - 80;
+            float instructY = menuY + menuHeight - 50;
             
-            RenderText("Use W/S or Arrow Keys to navigate", menuX + 20, instructY, 
-                      0.6f, 0.6f, 0.6f);
-            RenderText("Press ENTER to select", menuX + 20, instructY + 20, 
-                      0.6f, 0.6f, 0.6f);
-            RenderText("Press ESC to go back", menuX + 20, instructY + 40, 
-                      0.6f, 0.6f, 0.6f);
+            RenderText("W/S - Navigate", menuX + 20, instructY, 0.6f, 0.6f, 0.6f);
+            RenderText("ENTER - Select", menuX + 20, instructY + 15, 0.6f, 0.6f, 0.6f);
+            RenderText("ESC - Resume", menuX + 20, instructY + 30, 0.6f, 0.6f, 0.6f);
         }
         
         public void HandleInput(int key, int action)
         {
-            if (!isVisible || action == 0) return; // Only handle key press, not release
+            if (!isVisible || action == 0) return; // Only handle key press
             
             try
             {
-                switch (currentState)
+                switch (key)
                 {
-                    case MenuState.Main:
-                        HandleMainMenuInput(key);
+                    case 'w': // Up
+                    case 'W':
+                        selectedOption = (selectedOption - 1 + pauseMenuOptions.Length) % pauseMenuOptions.Length;
+                        Console.WriteLine($"Pause menu selection: {pauseMenuOptions[selectedOption]}");
                         break;
-                    case MenuState.Settings:
-                        HandleSettingsInput(key);
+                        
+                    case 's': // Down
+                    case 'S':
+                        selectedOption = (selectedOption + 1) % pauseMenuOptions.Length;
+                        Console.WriteLine($"Pause menu selection: {pauseMenuOptions[selectedOption]}");
                         break;
-                    case MenuState.Credits:
-                        HandleCreditsInput(key);
+                        
+                    case 13: // Enter
+                    case ' ': // Space
+                        ExecuteMenuOption(selectedOption);
+                        break;
+                        
+                    case 27: // ESC - Resume game
+                        ResumeGame();
                         break;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error handling menu input: {ex.Message}");
-            }
-        }
-        
-        private void HandleMainMenuInput(int key)
-        {
-            switch (key)
-            {
-                case 'w': // Up
-                case 'W':
-                    selectedOption = (selectedOption - 1 + mainMenuOptions.Length) % mainMenuOptions.Length;
-                    Console.WriteLine($"Menu selection: {mainMenuOptions[selectedOption]}");
-                    break;
-                    
-                case 's': // Down
-                case 'S':
-                    selectedOption = (selectedOption + 1) % mainMenuOptions.Length;
-                    Console.WriteLine($"Menu selection: {mainMenuOptions[selectedOption]}");
-                    break;
-                    
-                case 13: // Enter
-                case ' ': // Space
-                    ExecuteMenuOption(selectedOption);
-                    break;
-                    
-                case 27: // ESC
-                    // In main menu, ESC quits
-                    ExecuteMenuOption(3); // Quit option
-                    break;
-            }
-        }
-        
-        private void HandleSettingsInput(int key)
-        {
-            switch (key)
-            {
-                case 27: // ESC - Back to main menu
-                    currentState = MenuState.Main;
-                    selectedOption = 1; // Settings option
-                    Console.WriteLine("Returned to main menu from settings");
-                    break;
-            }
-        }
-        
-        private void HandleCreditsInput(int key)
-        {
-            switch (key)
-            {
-                case 27: // ESC - Back to main menu
-                case 13: // Enter
-                case ' ': // Space
-                    currentState = MenuState.Main;
-                    selectedOption = 2; // Credits option
-                    Console.WriteLine("Returned to main menu from credits");
-                    break;
+                Console.WriteLine($"Error handling pause menu input: {ex.Message}");
             }
         }
         
@@ -242,27 +179,27 @@ namespace SimpleShooter.UI
         {
             switch (option)
             {
-                case 0: // Play Game
-                    StartGame();
+                case 0: // Resume Game
+                    ResumeGame();
                     break;
                     
                 case 1: // Settings
                     OpenSettings();
                     break;
                     
-                case 2: // Credits
-                    ShowCredits();
+                case 2: // Main Menu
+                    ReturnToMainMenu();
                     break;
                     
-                case 3: // Quit
+                case 3: // Quit Game
                     QuitGame();
                     break;
             }
         }
         
-        private void StartGame()
+        private void ResumeGame()
         {
-            Console.WriteLine("Starting game...");
+            Console.WriteLine("Resuming game...");
             try
             {
                 set_game_phase(1); // GAME_PLAYING
@@ -270,26 +207,33 @@ namespace SimpleShooter.UI
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error starting game: {ex.Message}");
+                Console.WriteLine($"Error resuming game: {ex.Message}");
             }
         }
         
         private void OpenSettings()
         {
-            Console.WriteLine("Opening settings...");
-            currentState = MenuState.Settings;
-            // Settings will be rendered by SettingsMenu component
+            Console.WriteLine("Opening settings from pause menu...");
+            // Settings will be handled by the main UI manager
         }
         
-        private void ShowCredits()
+        private void ReturnToMainMenu()
         {
-            Console.WriteLine("Showing credits...");
-            currentState = MenuState.Credits;
+            Console.WriteLine("Returning to main menu...");
+            try
+            {
+                set_game_phase(0); // GAME_MENU
+                Hide();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error returning to main menu: {ex.Message}");
+            }
         }
         
         private void QuitGame()
         {
-            Console.WriteLine("Quitting game...");
+            Console.WriteLine("Quitting game from pause menu...");
             try
             {
                 quit_game();
@@ -303,15 +247,16 @@ namespace SimpleShooter.UI
         public void Show()
         {
             isVisible = true;
-            currentState = MenuState.Main;
             selectedOption = 0;
-            Console.WriteLine("Main menu shown");
+            fadeAlpha = 0.0f;
+            Console.WriteLine("Pause menu shown");
         }
         
         public void Hide()
         {
             isVisible = false;
-            Console.WriteLine("Main menu hidden");
+            fadeAlpha = 0.0f;
+            Console.WriteLine("Pause menu hidden");
         }
         
         public void SetWindowSize(int width, int height)
@@ -324,12 +269,11 @@ namespace SimpleShooter.UI
         
         public void Cleanup()
         {
-            Console.WriteLine("Main menu cleaned up");
+            Console.WriteLine("Pause menu cleaned up");
         }
         
         // Properties
         public bool IsVisible => isVisible;
-        public MenuState CurrentState => currentState;
         public int SelectedOption => selectedOption;
         
         // External rendering functions

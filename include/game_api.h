@@ -50,6 +50,9 @@ typedef enum {
     AI_DEAD
 } AIState;
 
+// Forward declaration for EnemyAI
+struct EnemyAI;
+
 // Enemy state structure
 typedef struct {
     Vector3 position;
@@ -61,6 +64,8 @@ typedef struct {
     float last_attack_time;
     EnemyType type;
     AIState ai_state;
+    int is_active;
+    struct EnemyAI* ai; // AI component
 } Enemy;
 
 // Projectile types

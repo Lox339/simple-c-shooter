@@ -8,6 +8,7 @@
 #include "../graphics_bridge.h"
 #include "../physics_bridge.h"
 #include "../ui_bridge.h"
+#include "../audio_bridge.h"
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
@@ -84,6 +85,11 @@ void init_core_engine() {
         printf("Warning: UI Manager initialization failed - using console output\n");
     }
     
+    // Initialize audio system
+    if (!init_audio_bridge()) {
+        printf("Warning: Audio system initialization failed - running without sound\n");
+    }
+    
     // Seed random number generator
     srand((unsigned int)time(NULL));
     
@@ -96,8 +102,11 @@ void run_game_loop() {
     
     GameState* game_state = get_game_state();
     
-    // Start in playing mode for input testing
-    game_state->current_phase = GAME_PLAYING;
+    // Start in menu mode
+    game_state->current_phase = GAME_MENU;
+    
+    // Start menu music
+    start_menu_music();
     
     double target_frame_time = 1.0 / g_game_loop.target_fps;
     int frame_count = 0;
@@ -123,6 +132,9 @@ void run_game_loop() {
         
         // Update UI
         update_ui_manager((float)g_game_loop.delta_time);
+        
+        // Update audio system
+        update_audio_system(game_state, (float)g_game_loop.delta_time);
         
         // Render frame
         render_game_frame(game_state);
@@ -196,9 +208,29 @@ void update_game_logic(float delta_time) {
     process_input();
     
     // Update game phase logic
+    static GamePhase last_phase = GAME_MENU;
+    if (game_state->current_phase != last_phase) {
+        // Phase changed, update music
+        switch (game_state->current_phase) {
+            case GAME_MENU:
+                start_menu_music();
+                break;
+            case GAME_PLAYING:
+                start_background_music();
+                break;
+            case GAME_PAUSED:
+                // Keep current music but could lower volume
+                break;
+            case GAME_OVER:
+                stop_current_music();
+                break;
+        }
+        last_phase = game_state->current_phase;
+    }
+    
     switch (game_state->current_phase) {
         case GAME_MENU:
-            // Menu logic will be implemented later
+            // Menu logic is handled by UI system
             break;
             
         case GAME_PLAYING:
@@ -215,7 +247,8 @@ void update_game_logic(float delta_time) {
             static float game_over_timer = 0.0f;
             game_over_timer += delta_time;
             if (game_over_timer > 3.0f) { // Show game over for 3 seconds
-                game_state->game_running = 0;
+                game_state->current_phase = GAME_MENU;
+                game_over_timer = 0.0f;
             }
             break;
     }
@@ -255,6 +288,7 @@ double get_delta_time() {
 
 void cleanup_core() {
     printf("Cleaning up Core Engine...\n");
+    cleanup_audio_bridge();
     cleanup_ui_manager();
     cleanup_physics_engine();
     cleanup_graphics_engine();

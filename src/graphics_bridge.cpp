@@ -42,6 +42,18 @@ extern "C" void render_text_opengl(const char* text, float x, float y, float r, 
 extern "C" void render_ui_background_opengl(float x, float y, float width, float height, 
                                            float r, float g, float b, float a);
 
+// Hit effects function
+void create_hit_effect_at_position(float x, float y, float z, int effect_type, float damage) {
+    if (!g_renderer) return;
+    
+    Vector3 position = {x, y, z};
+    
+    // Access the hit effects system from renderer (we'll need to add a getter)
+    // For now, just print debug info
+    std::cout << "Creating hit effect at (" << x << ", " << y << ", " << z 
+              << ") - Type: " << effect_type << ", Damage: " << damage << std::endl;
+}
+
 void render_game_frame(const GameState* game_state) {
     if (!g_renderer || !game_state) {
         return;

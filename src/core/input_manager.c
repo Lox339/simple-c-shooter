@@ -2,6 +2,7 @@
 #include "game_state.h"
 #include "object_manager.h"
 #include "../physics_bridge.h"
+#include "../audio_bridge.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -182,6 +183,13 @@ void handle_keyboard_input(int key, int action) {
             }
             break;
             
+        case 'o': // Open audio settings
+            if (action) {
+                printf("Audio settings toggled (press 1-6 to adjust volumes)\n");
+                printf("1/2: Master Volume +/-, 3/4: SFX Volume +/-, 5/6: Music Volume +/-\n");
+            }
+            break;
+            
         case KEY_W:
         case KEY_A:
         case KEY_S:
@@ -292,34 +300,47 @@ void fire_weapon() {
         return;
     }
     
-    // Calculate projectile spawn position (slightly in front of player)
+    // Calculate projectile spawn position (slightly in front of player at eye level)
     float yaw = player->rotation.y * M_PI / 180.0f;
-    Vector3 forward = {sinf(yaw), 0.0f, cosf(yaw)};
+    float pitch = player->rotation.x * M_PI / 180.0f;
     
-    Vector3 spawn_pos = {
-        player->position.x + forward.x * 1.0f,
-        player->position.y + 1.0f, // Shoot from chest height
-        player->position.z + forward.z * 1.0f
+    // Forward vector considering both yaw and pitch
+    Vector3 forward = {
+        sinf(yaw) * cosf(pitch),
+        -sinf(pitch),
+        cosf(yaw) * cosf(pitch)
     };
     
-    // Calculate projectile velocity (forward direction with some upward angle)
-    float pitch = player->rotation.x * M_PI / 180.0f;
+    // Spawn position at eye level (1.6m above ground) and 0.5m forward
+    Vector3 spawn_pos = {
+        player->position.x + forward.x * 0.5f,
+        player->position.y + 1.6f + forward.y * 0.5f,
+        player->position.z + forward.z * 0.5f
+    };
+    
+    // Calculate projectile velocity with high speed (50 units/sec)
+    float projectile_speed = 50.0f;
     Vector3 velocity = {
-        forward.x * 20.0f, // Fast horizontal speed
-        -sinf(pitch) * 20.0f, // Vertical component based on pitch
-        forward.z * 20.0f
+        forward.x * projectile_speed,
+        forward.y * projectile_speed,
+        forward.z * projectile_speed
     };
     
     // Create projectile
     int projectile_id = create_projectile(PROJECTILE_PLAYER_BULLET, spawn_pos, velocity, 0);
     
     if (projectile_id >= 0) {
+        // Play shooting sound
+        play_player_shoot_sound();
+        
         // Consume ammo
         player->ammo--;
-        printf("FIRE! Ammo: %d/%d\n", player->ammo, player->max_ammo);
+        printf("FIRE! Direction: (%.2f, %.2f, %.2f) Ammo: %d/%d\n", 
+               forward.x, forward.y, forward.z, player->ammo, player->max_ammo);
         
         // Auto-reload when empty
         if (player->ammo == 0) {
+            play_reload_sound();
             player->ammo = player->max_ammo;
             printf("Auto-reload! Ammo: %d/%d\n", player->ammo, player->max_ammo);
         }

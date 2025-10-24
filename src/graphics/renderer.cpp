@@ -175,6 +175,15 @@ bool Renderer::initialize() {
     // Initialize camera
     camera.initialize();
     
+    // Initialize projectile trail system
+    projectile_trail.initialize();
+    
+    // Initialize hit effects system
+    if (!hit_effects.initialize()) {
+        std::cerr << "Failed to initialize hit effects system" << std::endl;
+        return false;
+    }
+    
     initialized = true;
     std::cout << "Graphics Engine initialized successfully" << std::endl;
     return true;
@@ -304,42 +313,96 @@ void Renderer::render_frame(const GameState& game_state) {
         cube_model->render();
     }
     
-    // Render enemies with different models based on type
+    // Render enemies with different models and colors based on type and AI state
     for (int i = 0; i < game_state.enemy_count; i++) {
         const Enemy& enemy = game_state.enemies[i];
-        if (enemy.ai_state == AI_DEAD) continue;
+        if (enemy.ai_state == AI_DEAD || !enemy.is_active) continue;
         
         Matrix4 enemy_model = create_translation_matrix(enemy.position.x,
                                                        enemy.position.y + 0.5f,
                                                        enemy.position.z);
         
-        // Choose model and scale based on enemy type
+        // Choose model, scale, and color based on enemy type
         const Model* enemy_model_ptr = nullptr;
         float scale = 1.0f;
+        Vector3 enemy_color = {1.0f, 0.0f, 0.0f}; // Default red
         
         switch (enemy.type) {
             case ENEMY_BASIC:
                 enemy_model_ptr = cube_model;
                 scale = 1.0f;
+                enemy_color = {0.8f, 0.2f, 0.2f}; // Dark red
                 break;
             case ENEMY_FAST:
                 enemy_model_ptr = sphere_model;
                 scale = 0.8f;
+                enemy_color = {0.2f, 0.8f, 0.2f}; // Green
                 break;
             case ENEMY_HEAVY:
                 enemy_model_ptr = cube_model;
                 scale = 1.4f;
+                enemy_color = {0.2f, 0.2f, 0.8f}; // Blue
                 break;
+        }
+        
+        // Modify color based on AI state
+        switch (enemy.ai_state) {
+            case AI_PATROL:
+                // Dim the color for patrolling enemies
+                enemy_color.x *= 0.6f;
+                enemy_color.y *= 0.6f;
+                enemy_color.z *= 0.6f;
+                break;
+            case AI_CHASE:
+                // Brighten color for chasing enemies
+                enemy_color.x = std::min(1.0f, enemy_color.x * 1.3f);
+                enemy_color.y = std::min(1.0f, enemy_color.y * 1.3f);
+                enemy_color.z = std::min(1.0f, enemy_color.z * 1.3f);
+                break;
+            case AI_ATTACK:
+                // Flash red for attacking enemies
+                static float attack_flash = 0.0f;
+                attack_flash += game_state.delta_time * 10.0f;
+                float flash_intensity = (sin(attack_flash) + 1.0f) * 0.5f;
+                enemy_color = {1.0f, flash_intensity * 0.3f, flash_intensity * 0.3f};
+                break;
+            default:
+                break;
+        }
+        
+        // Apply health-based color modification
+        if (enemy.health > 0) {
+            float health_ratio = enemy.health / 100.0f; // Assuming max health around 100
+            if (health_ratio < 0.3f) {
+                // Flash when low health
+                static float low_health_flash = 0.0f;
+                low_health_flash += game_state.delta_time * 8.0f;
+                float flash = (sin(low_health_flash) + 1.0f) * 0.5f;
+                enemy_color.x = std::max(enemy_color.x, flash);
+            }
         }
         
         if (enemy_model_ptr) {
             enemy_model = multiply_matrices(enemy_model, create_scale_matrix(scale, scale, scale));
             set_matrix_uniform("model", enemy_model);
+            
+            // Set enemy color uniform
+            int color_loc = glGetUniformLocation(shader_program, "objectColor");
+            glUniform3f(color_loc, enemy_color.x, enemy_color.y, enemy_color.z);
+            
             enemy_model_ptr->render();
         }
     }
     
-    // Render projectiles as small spheres
+    // Update and render projectile trails
+    projectile_trail.update(game_state, game_state.delta_time);
+    projectile_trail.render(shader_program);
+    
+    // Update and render hit effects
+    hit_effects.update(game_state.delta_time);
+    hit_effects.render(shader_program);
+    
+    // Render projectiles as small spheres with glow effect
     if (sphere_model) {
         for (int i = 0; i < game_state.projectile_count; i++) {
             const Projectile& projectile = game_state.projectiles[i];
@@ -347,7 +410,7 @@ void Renderer::render_frame(const GameState& game_state) {
             Matrix4 projectile_model = create_translation_matrix(projectile.position.x,
                                                                projectile.position.y,
                                                                projectile.position.z);
-            projectile_model = multiply_matrices(projectile_model, create_scale_matrix(0.1f, 0.1f, 0.1f));
+            projectile_model = multiply_matrices(projectile_model, create_scale_matrix(0.15f, 0.15f, 0.15f));
             
             set_matrix_uniform("model", projectile_model);
             sphere_model->render();
@@ -392,6 +455,9 @@ void Renderer::cleanup() {
     
     // Clean up models
     cleanup_models();
+    
+    // Clean up projectile trails
+    projectile_trail.cleanup();
     
     // Clean up OpenGL objects
     if (shader_program) glDeleteProgram(shader_program);

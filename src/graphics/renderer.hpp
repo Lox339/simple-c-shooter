@@ -3,6 +3,8 @@
 
 #include "../game_api.h"
 #include "camera.hpp"
+#include "projectile_trail.hpp"
+#include "hit_effects.hpp"
 
 #ifdef GLFW_AVAILABLE
 struct GLFWwindow;
@@ -43,6 +45,8 @@ private:
     bool initialized;
     
     Camera camera;
+    ProjectileTrail projectile_trail;
+    HitEffectsSystem hit_effects;
     
     // Private methods
     bool create_shader_program();

@@ -60,6 +60,22 @@ GameState* get_core_game_state() {
     return &g_game_state;
 }
 
+void set_game_phase(int phase) {
+    if (phase >= 0 && phase <= 3) {
+        g_game_state.current_phase = (GamePhase)phase;
+        printf("Game phase changed to: %d\n", phase);
+    }
+}
+
+int get_game_phase() {
+    return (int)g_game_state.current_phase;
+}
+
+void quit_game() {
+    g_game_state.game_running = 0;
+    printf("Game quit requested\n");
+}
+
 void cleanup_game_state() {
     printf("Game State cleaned up\n");
 }

@@ -1,5 +1,8 @@
 #include "object_manager.h"
 #include "game_state.h"
+#include "enemy_ai.h"
+#include "collision_system.h"
+#include "../audio_bridge.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,8 +49,17 @@ int create_enemy(EnemyType type, Vector3 position) {
     enemy->type = type;
     enemy->ai_state = AI_PATROL;
     enemy->last_attack_time = 0.0f;
+    enemy->is_active = 1;
     
-    // Set enemy properties based on type
+    // Allocate and initialize AI component
+    enemy->ai = malloc(sizeof(EnemyAI));
+    if (enemy->ai) {
+        EnemyType ai_type = (type == ENEMY_BASIC) ? ENEMY_TYPE_BASIC :
+                           (type == ENEMY_FAST) ? ENEMY_TYPE_FAST : ENEMY_TYPE_HEAVY;
+        enemy_ai_init(enemy->ai, ai_type);
+    }
+    
+    // Set enemy properties based on type (keep for compatibility)
     switch (type) {
         case ENEMY_BASIC:
             enemy->health = 50.0f;
@@ -70,7 +82,7 @@ int create_enemy(EnemyType type, Vector3 position) {
     
     game_state->enemy_count++;
     
-    printf("Created %s enemy at (%.2f, %.2f, %.2f) - ID: %d\n",
+    printf("Created %s enemy with AI at (%.2f, %.2f, %.2f) - ID: %d\n",
            type == ENEMY_BASIC ? "BASIC" : 
            type == ENEMY_FAST ? "FAST" : "HEAVY",
            position.x, position.y, position.z, enemy_id);
@@ -84,12 +96,29 @@ void update_enemies(float delta_time) {
     for (int i = 0; i < game_state->enemy_count; i++) {
         Enemy* enemy = &game_state->enemies[i];
         
-        if (enemy->ai_state == AI_DEAD) {
+        if (!enemy->is_active || enemy->ai_state == AI_DEAD) {
             continue;
         }
         
-        update_enemy_ai(enemy, &game_state->player, delta_time);
-        update_enemy_movement(enemy, delta_time);
+        // Use new AI system if available
+        if (enemy->ai) {
+            enemy_ai_update(enemy->ai, enemy, &game_state->player, delta_time);
+            
+            // Sync AI health with enemy health
+            enemy->health = enemy->ai->health;
+            
+            // Update legacy ai_state for compatibility
+            switch (enemy->ai->state) {
+                case AI_STATE_IDLE: enemy->ai_state = AI_PATROL; break;
+                case AI_STATE_CHASING: enemy->ai_state = AI_CHASE; break;
+                case AI_STATE_ATTACKING: enemy->ai_state = AI_ATTACK; break;
+                case AI_STATE_DEAD: enemy->ai_state = AI_DEAD; break;
+            }
+        } else {
+            // Fallback to old AI system
+            update_enemy_ai(enemy, &game_state->player, delta_time);
+            update_enemy_movement(enemy, delta_time);
+        }
     }
 }
 
@@ -182,28 +211,43 @@ void update_enemy_movement(Enemy* enemy, float delta_time) {
 void attack_player(Enemy* enemy, PlayerState* player) {
     printf("Enemy %p attacks player! ", (void*)enemy);
     
-    // Calculate damage based on enemy type
-    int damage = 0;
-    switch (enemy->type) {
-        case ENEMY_BASIC: damage = 10; break;
-        case ENEMY_FAST: damage = 15; break;
-        case ENEMY_HEAVY: damage = 25; break;
-    }
+    // Create projectile towards player
+    Vector3 direction;
+    direction.x = player->position.x - enemy->position.x;
+    direction.y = player->position.y - enemy->position.y + 1.0f; // Aim slightly higher
+    direction.z = player->position.z - enemy->position.z;
     
-    // Apply damage to player
-    player->health -= damage;
-    if (player->health < 0) {
-        player->health = 0;
-    }
-    
-    printf("Player takes %d damage! Health: %d/%d\n", 
-           damage, player->health, player->max_health);
-    
-    // Check if player died
-    if (player->health <= 0) {
-        printf("Player died! Game Over!\n");
-        GameState* game_state = get_game_state();
-        game_state->current_phase = GAME_OVER;
+    // Normalize direction
+    float length = sqrtf(direction.x*direction.x + direction.y*direction.y + direction.z*direction.z);
+    if (length > 0.0f) {
+        direction.x /= length;
+        direction.y /= length;
+        direction.z /= length;
+        
+        // Set projectile speed based on enemy type
+        float projectile_speed = 15.0f;
+        switch (enemy->type) {
+            case ENEMY_BASIC: projectile_speed = 12.0f; break;
+            case ENEMY_FAST: projectile_speed = 18.0f; break;
+            case ENEMY_HEAVY: projectile_speed = 10.0f; break;
+        }
+        
+        Vector3 projectile_velocity = {
+            direction.x * projectile_speed,
+            direction.y * projectile_speed,
+            direction.z * projectile_speed
+        };
+        
+        // Create enemy projectile
+        Vector3 spawn_pos = enemy->position;
+        spawn_pos.y += 1.0f; // Spawn slightly above enemy
+        
+        create_projectile(PROJECTILE_ENEMY_BULLET, spawn_pos, projectile_velocity, -1);
+        
+        // Play enemy shoot sound
+        play_enemy_shoot_sound(enemy->position);
+        
+        printf("Enemy fired projectile at player!\n");
     }
 }
 
@@ -215,6 +259,12 @@ void remove_enemy(int enemy_id) {
     }
     
     printf("Removing enemy ID: %d\n", enemy_id);
+    
+    // Free AI memory if allocated
+    if (game_state->enemies[enemy_id].ai) {
+        free(game_state->enemies[enemy_id].ai);
+        game_state->enemies[enemy_id].ai = NULL;
+    }
     
     // Shift remaining enemies down
     for (int i = enemy_id; i < game_state->enemy_count - 1; i++) {
@@ -273,8 +323,8 @@ void update_projectiles(float delta_time) {
         projectile->position.y += projectile->velocity.y * delta_time;
         projectile->position.z += projectile->velocity.z * delta_time;
         
-        // Apply gravity
-        projectile->velocity.y -= 9.81f * delta_time;
+        // Apply gravity (reduced for faster projectiles)
+        projectile->velocity.y -= 5.0f * delta_time;
         
         // Update lifetime
         projectile->lifetime -= delta_time;
@@ -296,23 +346,30 @@ void update_projectiles(float delta_time) {
         if (projectile->type == PROJECTILE_PLAYER_BULLET) {
             for (int j = 0; j < game_state->enemy_count; j++) {
                 Enemy* enemy = &game_state->enemies[j];
-                if (enemy->ai_state == AI_DEAD) continue;
+                if (enemy->ai_state == AI_DEAD || !enemy->is_active) continue;
                 
-                float dx = projectile->position.x - enemy->position.x;
-                float dy = projectile->position.y - enemy->position.y;
-                float dz = projectile->position.z - enemy->position.z;
-                float distance = sqrtf(dx*dx + dy*dy + dz*dz);
-                
-                if (distance < 1.0f) { // Hit radius
-                    // Damage enemy
-                    enemy->health -= projectile->damage;
-                    printf("Projectile hit enemy! Damage: %.0f, Enemy health: %.0f\n", 
-                           projectile->damage, enemy->health);
+                CollisionResult collision;
+                if (check_projectile_enemy_collision(projectile, enemy, &collision)) {
+                    // Create damage info
+                    DamageInfo damage;
+                    damage.amount = projectile->damage;
+                    damage.hit_point = collision.hit_point;
+                    damage.hit_direction = vector3_normalize(projectile->velocity);
+                    damage.damage_type = 0; // bullet damage
                     
-                    if (enemy->health <= 0) {
-                        enemy->ai_state = AI_DEAD;
-                        game_state->score += 100; // Award points
-                        printf("Enemy killed! Score: %d\n", game_state->score);
+                    // Apply damage using new system
+                    apply_damage_to_enemy(enemy, &damage);
+                    
+                    // Award points if enemy was killed
+                    if (enemy->ai_state == AI_DEAD) {
+                        int points = 0;
+                        switch (enemy->type) {
+                            case ENEMY_BASIC: points = 100; break;
+                            case ENEMY_FAST: points = 150; break;
+                            case ENEMY_HEAVY: points = 200; break;
+                        }
+                        game_state->score += points;
+                        printf("Enemy killed! +%d points, Score: %d\n", points, game_state->score);
                     }
                     
                     should_remove = 1;
@@ -323,20 +380,17 @@ void update_projectiles(float delta_time) {
         
         // Check collision with player (for enemy bullets)
         if (projectile->type == PROJECTILE_ENEMY_BULLET) {
-            float dx = projectile->position.x - game_state->player.position.x;
-            float dy = projectile->position.y - game_state->player.position.y;
-            float dz = projectile->position.z - game_state->player.position.z;
-            float distance = sqrtf(dx*dx + dy*dy + dz*dz);
-            
-            if (distance < 1.0f) { // Hit radius
-                // Damage player
-                game_state->player.health -= (int)projectile->damage;
-                if (game_state->player.health < 0) {
-                    game_state->player.health = 0;
-                }
+            CollisionResult collision;
+            if (check_projectile_player_collision(projectile, &game_state->player, &collision)) {
+                // Create damage info
+                DamageInfo damage;
+                damage.amount = projectile->damage;
+                damage.hit_point = collision.hit_point;
+                damage.hit_direction = vector3_normalize(projectile->velocity);
+                damage.damage_type = 0; // bullet damage
                 
-                printf("Player hit by projectile! Damage: %.0f, Health: %d/%d\n", 
-                       projectile->damage, game_state->player.health, game_state->player.max_health);
+                // Apply damage using new system
+                apply_damage_to_player(&game_state->player, &damage);
                 
                 if (game_state->player.health <= 0) {
                     printf("Player died! Game Over!\n");

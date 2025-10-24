@@ -53,6 +53,8 @@ namespace SimpleShooter.UI
         private GameHUD gameHUD;
         private MainMenu mainMenu;
         private SettingsMenu settingsMenu;
+        private PauseMenu pauseMenu;
+        private AudioSettings audioSettings;
         
         private bool initialized = false;
         private int windowWidth = 1024;
@@ -109,6 +111,16 @@ namespace SimpleShooter.UI
                     return false;
                 }
 
+                pauseMenu = new PauseMenu();
+                if (!pauseMenu.Initialize(windowWidth, windowHeight))
+                {
+                    Console.WriteLine("Failed to initialize pause menu");
+                    return false;
+                }
+
+                audioSettings = new AudioSettings();
+                Console.WriteLine("Audio settings initialized");
+
                 initialized = true;
                 Console.WriteLine("UI Manager initialized successfully");
                 return true;
@@ -134,16 +146,22 @@ namespace SimpleShooter.UI
                 {
                     case 0: // GAME_MENU
                         mainMenu?.Update(deltaTime);
+                        if (settingsMenu?.IsVisible == true)
+                            settingsMenu?.Update(deltaTime);
                         break;
                         
                     case 1: // GAME_PLAYING
                         speedometer?.Update(gameState.player.speed, gameState.player.on_ground != 0);
                         gameHUD?.Update(gameState.player, gameState.score, deltaTime);
+                        audioSettings?.Update(deltaTime);
                         break;
                         
                     case 2: // GAME_PAUSED
                         // Keep HUD visible but show pause menu
                         gameHUD?.Update(gameState.player, gameState.score, deltaTime);
+                        pauseMenu?.Update(deltaTime);
+                        if (settingsMenu?.IsVisible == true)
+                            settingsMenu?.Update(deltaTime);
                         break;
                         
                     case 3: // GAME_OVER
@@ -170,17 +188,22 @@ namespace SimpleShooter.UI
                 {
                     case 0: // GAME_MENU
                         mainMenu?.Render();
+                        if (settingsMenu?.IsVisible == true)
+                            settingsMenu?.Render();
                         break;
                         
                     case 1: // GAME_PLAYING
                         gameHUD?.Render();
                         speedometer?.Render();
+                        audioSettings?.Render();
                         break;
                         
                     case 2: // GAME_PAUSED
                         gameHUD?.Render();
                         speedometer?.Render();
-                        // TODO: Add pause overlay
+                        pauseMenu?.Render();
+                        if (settingsMenu?.IsVisible == true)
+                            settingsMenu?.Render();
                         break;
                         
                     case 3: // GAME_OVER
@@ -206,11 +229,17 @@ namespace SimpleShooter.UI
                 switch (gameState.current_phase)
                 {
                     case 0: // GAME_MENU
-                        mainMenu?.HandleInput(key, action);
+                        if (settingsMenu?.IsVisible == true)
+                            settingsMenu?.HandleInput(key, action);
+                        else
+                            mainMenu?.HandleInput(key, action);
                         break;
                         
                     case 2: // GAME_PAUSED
-                        // Handle pause menu input
+                        if (settingsMenu?.IsVisible == true)
+                            settingsMenu?.HandleInput(key, action);
+                        else
+                            pauseMenu?.HandleInput(key, action);
                         break;
                 }
             }
@@ -251,6 +280,7 @@ namespace SimpleShooter.UI
                 gameHUD?.SetWindowSize(width, height);
                 mainMenu?.SetWindowSize(width, height);
                 settingsMenu?.SetWindowSize(width, height);
+                pauseMenu?.SetWindowSize(width, height);
                 
                 Console.WriteLine($"UI window size updated: {width}x{height}");
             }
@@ -268,11 +298,14 @@ namespace SimpleShooter.UI
                 gameHUD?.Cleanup();
                 mainMenu?.Cleanup();
                 settingsMenu?.Cleanup();
+                pauseMenu?.Cleanup();
+                audioSettings = null;
 
                 speedometer = null;
                 gameHUD = null;
                 mainMenu = null;
                 settingsMenu = null;
+                pauseMenu = null;
 
                 initialized = false;
                 Console.WriteLine("UI Manager cleaned up");

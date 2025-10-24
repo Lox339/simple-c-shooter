@@ -1,0 +1,286 @@
+name: Test Simple C Shooter
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  BUILD_TYPE: Debug
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup CMake
+      uses: jwlawson/actions-setup-cmake@v1.14
+      with:
+        cmake-version: '3.20'
+
+    - name: Install Linux dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libglfw3-dev \
+          libglew-dev \
+          libgl1-mesa-dev \
+          libopenal-dev \
+          libsndfile1-dev \
+          valgrind \
+          pkg-config
+
+    - name: Install macOS dependencies
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew update
+        brew install \
+          cmake \
+          glfw \
+          glew \
+          openal-soft \
+          libsndfile \
+          pkg-config
+
+    - name: Install Windows dependencies
+      if: matrix.os == 'windows-latest'
+      run: |
+        vcpkg install glfw3:x64-windows
+        vcpkg install glew:x64-windows
+        vcpkg install openal-soft:x64-windows
+        vcpkg install libsndfile:x64-windows
+        vcpkg integrate install
+
+    - name: Configure CMake (Debug)
+      run: |
+        cmake -B ${{github.workspace}}/build \
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+          ${{ matrix.os == 'windows-latest' && '-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake' || '' }}
+
+    - name: Build with Debug info
+      run: |
+        cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel
+
+    - name: Run unit tests
+      working-directory: ${{github.workspace}}/build
+      run: ctest -C ${{env.BUILD_TYPE}} --output-on-failure --verbose
+
+    - name: Run memory tests (Linux only)
+      if: matrix.os == 'ubuntu-latest'
+      working-directory: ${{github.workspace}}/build
+      run: |
+        valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all \
+          --track-origins=yes --verbose --error-exitcode=1 \
+          ./simple_shooter --test
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup CMake
+      uses: jwlawson/actions-setup-cmake@v1.14
+      with:
+        cmake-version: '3.20'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libglfw3-dev \
+          libglew-dev \
+          libgl1-mesa-dev \
+          libopenal-dev \
+          libsndfile1-dev \
+          time \
+          pkg-config
+
+    - name: Configure CMake (Release)
+      run: |
+        cmake -B ${{github.workspace}}/build \
+          -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build optimized
+      run: |
+        cmake --build ${{github.workspace}}/build --config Release --parallel
+
+    - name: Run performance tests
+      working-directory: ${{github.workspace}}/build
+      run: |
+        echo "Testing startup performance..."
+        time timeout 5s ./simple_shooter --test || true
+        
+        echo "Testing memory usage..."
+        /usr/bin/time -v timeout 5s ./simple_shooter --test || true
+
+  compatibility-tests:
+    name: Compatibility Tests
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          - ubuntu:20.04
+          - ubuntu:22.04
+          - debian:11
+          - debian:12
+
+    steps:
+    - name: Install git and basic tools
+      run: |
+        apt-get update
+        apt-get install -y git wget curl
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install build dependencies
+      run: |
+        apt-get install -y \
+          build-essential \
+          cmake \
+          libglfw3-dev \
+          libglew-dev \
+          libgl1-mesa-dev \
+          libopenal-dev \
+          libsndfile1-dev \
+          pkg-config
+
+    - name: Build and test
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
+        cmake --build build --parallel
+        cd build && timeout 10s ./simple_shooter --test || true
+
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install analysis tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          cppcheck \
+          clang-tidy \
+          iwyu \
+          build-essential \
+          cmake \
+          libglfw3-dev \
+          libglew-dev \
+          libgl1-mesa-dev \
+          libopenal-dev \
+          libsndfile1-dev
+
+    - name: Run cppcheck
+      run: |
+        cppcheck --enable=all --inconclusive --force \
+          --suppress=missingIncludeSystem \
+          --suppress=unusedFunction \
+          --error-exitcode=1 \
+          src/
+
+    - name: Configure for clang-tidy
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+    - name: Run clang-tidy
+      run: |
+        clang-tidy src/core/*.c src/graphics/*.cpp src/physics/*.cpp \
+          -p build/ \
+          --warnings-as-errors=* \
+          --header-filter=.* || true
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup CMake
+      uses: jwlawson/actions-setup-cmake@v1.14
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '6.0.x'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          libglfw3-dev \
+          libglew-dev \
+          libgl1-mesa-dev \
+          libopenal-dev \
+          libsndfile1-dev
+
+    - name: Build C/C++ components
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
+        cmake --build build --parallel
+
+    - name: Build C# components
+      run: |
+        dotnet restore src/ui/SimpleShooter.UI.csproj
+        dotnet build src/ui/SimpleShooter.UI.csproj --configuration Release
+
+    - name: Test C/C++ and C# integration
+      run: |
+        # Test that shared library can be loaded
+        ldd build/libgame_core.so
+        
+        # Test basic functionality
+        timeout 10s build/simple_shooter --test
+        
+        # Test C# can load native library
+        dotnet test src/ui/SimpleShooter.UI.csproj --configuration Release || true
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'

@@ -2,6 +2,7 @@
 build/
 bin/
 obj/
+out/
 
 # CMake generated files
 CMakeCache.txt
@@ -9,8 +10,9 @@ CMakeFiles/
 cmake_install.cmake
 Makefile
 *.cmake
+!CMakeLists.txt
 
-# Visual Studio / MSBuild
+# Visual Studio
 .vs/
 *.vcxproj
 *.vcxproj.filters
@@ -18,31 +20,75 @@ Makefile
 *.sln
 *.suo
 *.user
+*.userosscache
+*.sln.docstates
 
-# .NET
-*.dll
-*.exe
-*.pdb
-packages/
+# Visual Studio Code
+.vscode/
+*.code-workspace
 
 # Compiled Object files
 *.o
 *.obj
+*.lo
+*.slo
+*.ko
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
 *.so
 *.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
 *.a
 *.lib
 
+# Executables
+*.exe
+*.out
+*.app
+simple_shooter
+simple_shooter.exe
+
 # Debug files
 *.dSYM/
+*.su
+*.idb
 *.pdb
 
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# C# specific
+*.dll
+*.exe
+*.pdb
+*.cache
+*.tmp
+packages/
+TestResults/
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+**/Properties/launchSettings.json
+
+# Audio files (generated)
+sounds/
+music/
+
+# Logs
+*.log
+logs/
 
 # OS generated files
 .DS_Store
@@ -53,5 +99,84 @@ packages/
 ehthumbs.db
 Thumbs.db
 
-# Logs
-*.log
+# IDE files
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Package managers
+node_modules/
+.npm
+.yarn/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# Rust
+target/
+Cargo.lock
+
+# Go
+*.exe~
+*.test
+*.prof
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+
+# Archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Profiling and debugging
+*.prof
+*.trace
+callgrind.out.*
+massif.out.*
+cachegrind.out.*
+helgrind.out.*
+drd.out.*
+
+# Coverage reports
+*.gcov
+*.gcda
+*.gcno
+coverage/
+*.coverage
+*.coveragexml
+
+# Documentation generated files
+docs/_build/
+docs/html/
+docs/latex/
+
+# Local configuration
+config.local.*
+.env
+.env.local
+
+# Game specific
+saves/
+screenshots/
+replays/
